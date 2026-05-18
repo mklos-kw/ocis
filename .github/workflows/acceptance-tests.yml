@@ -162,10 +162,16 @@ jobs:
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
         uses: ./.github/actions/ocis-test
         with:
           suite: ${{ matrix.suite }}
+          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -213,10 +219,16 @@ jobs:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
           email: "true"
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
         uses: ./.github/actions/ocis-test
         with:
           suite: ${{ matrix.suite }}
+          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -263,10 +275,16 @@ jobs:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
           tika: "true"
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
         uses: ./.github/actions/ocis-test
         with:
           suite: ${{ matrix.suite }}
+          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -306,10 +324,16 @@ jobs:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
           antivirus: "true"
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
       - name: Test apiAntivirus
         uses: ./.github/actions/ocis-test
         with:
           suite: apiAntivirus
+          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -349,10 +373,16 @@ jobs:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
           extra-server-env: '{"OCIS_ADD_RUN_SERVICES":"auth-app","PROXY_ENABLE_APP_AUTH":"true"}'
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
       - name: Test apiAuthApp
         uses: ./.github/actions/ocis-test
         with:
           suite: apiAuthApp
+          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -510,10 +540,16 @@ jobs:
           demo-users: "true"
           email: "true"
           antivirus: "true"
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
         uses: ./.github/actions/ocis-test
         with:
           suite: ${{ matrix.suite }}
+          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -565,12 +601,16 @@ jobs:
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
+      - name: Merge expected failures files
+        run: |
+          cp tests/acceptance/expected-failures-API-on-OCIS-storage.md /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
         uses: ./.github/actions/ocis-test
         with:
           suite: ${{ matrix.suite }}
           acceptance-test-type: core-api
           with-remote-php: "true"
+          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
