@@ -479,7 +479,6 @@ jobs:
           FED_ENV+=("NOTIFICATIONS_SMTP_PORT=1025")
           FED_ENV+=("NOTIFICATIONS_SMTP_INSECURE=true")
           FED_ENV+=("NOTIFICATIONS_SMTP_SENDER=ownCloud <noreply@example.com>")
-          FED_ENV+=("NOTIFICATIONS_DEBUG_ADDR=0.0.0.0:9174")
 
           env "${FED_ENV[@]}" ocis/bin/ocis init --insecure true --config-path "$FED_CONFIG_DIR"
           cp tests/config/ci/app-registry.yaml "$FED_CONFIG_DIR/app-registry.yaml"
@@ -1191,6 +1190,7 @@ jobs:
         id: ocis
         with:
           ocis-binary: ocis/bin/ocis
+          demo-users: "true"
           extra-server-env: >-
             {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
             "OCIS_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD":"false"}
