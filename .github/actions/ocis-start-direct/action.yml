@@ -50,82 +50,78 @@ runs:
 
     - name: Init oCIS
       shell: bash
+      env:
+        EXTRA_SERVER_ENV: ${{ inputs.extra-server-env }}
+        DEMO_USERS: ${{ inputs.demo-users }}
+        EXCLUDE_SERVICES: ${{ inputs.exclude-services }}
+        WORKSPACE: ${{ github.workspace }}
       run: |
         CONFIG_DIR="${HOME}/.ocis/config"
         mkdir -p "$CONFIG_DIR"
-        BRIDGE_IP="${OCIS_BRIDGE_IP}"
-        OCIS_URL="https://${BRIDGE_IP}:9200"
+        OCIS_URL="https://${OCIS_BRIDGE_IP}:9200"
 
-        # Build env for init (same vars used for server)
-        EXTRA_ENV=()
-        EXTRA_ENV+=("OCIS_URL=${OCIS_URL}")
-        EXTRA_ENV+=("OCIS_CONFIG_DIR=${CONFIG_DIR}")
-        EXTRA_ENV+=("STORAGE_USERS_DRIVER=ocis")
-        EXTRA_ENV+=("PROXY_ENABLE_BASIC_AUTH=true")
-        EXTRA_ENV+=("OCIS_EXCLUDE_RUN_SERVICES=${{ inputs.exclude-services }}")
-        EXTRA_ENV+=("OCIS_LOG_LEVEL=error")
-        EXTRA_ENV+=("IDM_CREATE_DEMO_USERS=${{ inputs.demo-users }}")
-        EXTRA_ENV+=("IDM_ADMIN_PASSWORD=admin")
-        EXTRA_ENV+=("FRONTEND_SEARCH_MIN_LENGTH=2")
-        EXTRA_ENV+=("OCIS_ASYNC_UPLOADS=true")
-        EXTRA_ENV+=("OCIS_EVENTS_ENABLE_TLS=false")
-        EXTRA_ENV+=("NATS_NATS_HOST=0.0.0.0")
-        EXTRA_ENV+=("NATS_NATS_PORT=9233")
-        EXTRA_ENV+=("OCIS_JWT_SECRET=some-ocis-jwt-secret")
-        EXTRA_ENV+=("EVENTHISTORY_STORE=memory")
-        EXTRA_ENV+=("WEB_UI_CONFIG_FILE=${{ github.workspace }}/tests/config/ci/ocis-config.json")
+        EXTRA_ENV=(
+          "OCIS_URL=${OCIS_URL}"
+          "OCIS_CONFIG_DIR=${CONFIG_DIR}"
+          "STORAGE_USERS_DRIVER=ocis"
+          "PROXY_ENABLE_BASIC_AUTH=true"
+          "OCIS_EXCLUDE_RUN_SERVICES=${EXCLUDE_SERVICES}"
+          "OCIS_LOG_LEVEL=error"
+          "IDM_CREATE_DEMO_USERS=${DEMO_USERS}"
+          "IDM_ADMIN_PASSWORD=admin"
+          "FRONTEND_SEARCH_MIN_LENGTH=2"
+          "OCIS_ASYNC_UPLOADS=true"
+          "OCIS_EVENTS_ENABLE_TLS=false"
+          "NATS_NATS_HOST=0.0.0.0"
+          "NATS_NATS_PORT=9233"
+          "OCIS_JWT_SECRET=some-ocis-jwt-secret"
+          "EVENTHISTORY_STORE=memory"
+          "WEB_UI_CONFIG_FILE=${WORKSPACE}/tests/config/ci/ocis-config.json"
+        )
 
-        # Apply extra-server-env JSON
-        EXTRA_JSON='${{ inputs.extra-server-env }}'
-        if [[ -n "$EXTRA_JSON" && "$EXTRA_JSON" != "{}" ]]; then
-          while IFS=$'\x01' read -r -d $'\x00' key val; do
-            EXTRA_ENV+=("${key}=${val}")
-          done < <(echo "$EXTRA_JSON" | python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-for k, v in d.items():
-    sys.stdout.buffer.write(k.encode() + b'\x01' + v.encode() + b'\x00')
-")
+        if [[ -n "$EXTRA_SERVER_ENV" && "$EXTRA_SERVER_ENV" != "{}" ]]; then
+          while IFS= read -r pair; do
+            EXTRA_ENV+=("$pair")
+          done < <(echo "$EXTRA_SERVER_ENV" | jq -r 'to_entries[] | "\(.key)=\(.value)"')
         fi
 
         env "${EXTRA_ENV[@]}" ocis init --insecure true
-        cp "${{ github.workspace }}/tests/config/ci/app-registry.yaml" "${CONFIG_DIR}/app-registry.yaml"
+        cp "${WORKSPACE}/tests/config/ci/app-registry.yaml" "${CONFIG_DIR}/app-registry.yaml"
 
     - name: Start oCIS server
       shell: bash
+      env:
+        EXTRA_SERVER_ENV: ${{ inputs.extra-server-env }}
+        DEMO_USERS: ${{ inputs.demo-users }}
+        EXCLUDE_SERVICES: ${{ inputs.exclude-services }}
+        WORKSPACE: ${{ github.workspace }}
       run: |
         CONFIG_DIR="${HOME}/.ocis/config"
-        BRIDGE_IP="${OCIS_BRIDGE_IP}"
-        OCIS_URL="https://${BRIDGE_IP}:9200"
+        OCIS_URL="https://${OCIS_BRIDGE_IP}:9200"
 
-        EXTRA_ENV=()
-        EXTRA_ENV+=("OCIS_URL=${OCIS_URL}")
-        EXTRA_ENV+=("OCIS_CONFIG_DIR=${CONFIG_DIR}")
-        EXTRA_ENV+=("STORAGE_USERS_DRIVER=ocis")
-        EXTRA_ENV+=("PROXY_ENABLE_BASIC_AUTH=true")
-        EXTRA_ENV+=("OCIS_EXCLUDE_RUN_SERVICES=${{ inputs.exclude-services }}")
-        EXTRA_ENV+=("OCIS_LOG_LEVEL=error")
-        EXTRA_ENV+=("IDM_CREATE_DEMO_USERS=${{ inputs.demo-users }}")
-        EXTRA_ENV+=("IDM_ADMIN_PASSWORD=admin")
-        EXTRA_ENV+=("FRONTEND_SEARCH_MIN_LENGTH=2")
-        EXTRA_ENV+=("OCIS_ASYNC_UPLOADS=true")
-        EXTRA_ENV+=("OCIS_EVENTS_ENABLE_TLS=false")
-        EXTRA_ENV+=("NATS_NATS_HOST=0.0.0.0")
-        EXTRA_ENV+=("NATS_NATS_PORT=9233")
-        EXTRA_ENV+=("OCIS_JWT_SECRET=some-ocis-jwt-secret")
-        EXTRA_ENV+=("EVENTHISTORY_STORE=memory")
-        EXTRA_ENV+=("WEB_UI_CONFIG_FILE=${{ github.workspace }}/tests/config/ci/ocis-config.json")
+        EXTRA_ENV=(
+          "OCIS_URL=${OCIS_URL}"
+          "OCIS_CONFIG_DIR=${CONFIG_DIR}"
+          "STORAGE_USERS_DRIVER=ocis"
+          "PROXY_ENABLE_BASIC_AUTH=true"
+          "OCIS_EXCLUDE_RUN_SERVICES=${EXCLUDE_SERVICES}"
+          "OCIS_LOG_LEVEL=error"
+          "IDM_CREATE_DEMO_USERS=${DEMO_USERS}"
+          "IDM_ADMIN_PASSWORD=admin"
+          "FRONTEND_SEARCH_MIN_LENGTH=2"
+          "OCIS_ASYNC_UPLOADS=true"
+          "OCIS_EVENTS_ENABLE_TLS=false"
+          "NATS_NATS_HOST=0.0.0.0"
+          "NATS_NATS_PORT=9233"
+          "OCIS_JWT_SECRET=some-ocis-jwt-secret"
+          "EVENTHISTORY_STORE=memory"
+          "WEB_UI_CONFIG_FILE=${WORKSPACE}/tests/config/ci/ocis-config.json"
+        )
 
-        EXTRA_JSON='${{ inputs.extra-server-env }}'
-        if [[ -n "$EXTRA_JSON" && "$EXTRA_JSON" != "{}" ]]; then
-          while IFS=$'\x01' read -r -d $'\x00' key val; do
-            EXTRA_ENV+=("${key}=${val}")
-          done < <(echo "$EXTRA_JSON" | python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-for k, v in d.items():
-    sys.stdout.buffer.write(k.encode() + b'\x01' + v.encode() + b'\x00')
-")
+        if [[ -n "$EXTRA_SERVER_ENV" && "$EXTRA_SERVER_ENV" != "{}" ]]; then
+          while IFS= read -r pair; do
+            EXTRA_ENV+=("$pair")
+          done < <(echo "$EXTRA_SERVER_ENV" | jq -r 'to_entries[] | "\(.key)=\(.value)"')
         fi
 
         env "${EXTRA_ENV[@]}" ocis server > /tmp/ocis-direct.log 2>&1 &

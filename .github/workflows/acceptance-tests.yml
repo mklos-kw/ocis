@@ -419,21 +419,11 @@ jobs:
           make -C tests/ociswrapper build GOWORK=off
       - name: Rewrite providers.json for localhost
         run: |
-          python3 -c "
-import json, sys
-data = json.loads(open('tests/config/ci/providers.json').read())
-for p in data:
-    p['domain'] = p['domain'].replace('ocis-server:9200', 'localhost:9200') \
-                              .replace('federation-ocis-server:10200', 'localhost:10200')
-    for svc in p.get('services', []):
-        ep = svc.get('endpoint', {})
-        ep['path'] = ep.get('path', '').replace('ocis-server:9200', 'localhost:9200') \
-                                       .replace('federation-ocis-server:10200', 'localhost:10200')
-        svc['host'] = svc.get('host', '').replace('ocis-server:9200', 'localhost:9200') \
-                                         .replace('federation-ocis-server:10200', 'localhost:10200')
-open('/tmp/ocm-providers.json', 'w').write(json.dumps(data, indent=2))
-print('providers.json rewritten to /tmp/ocm-providers.json')
-"
+          sed \
+            -e 's|ocis-server:9200|localhost:9200|g' \
+            -e 's|federation-ocis-server:10200|localhost:10200|g' \
+            tests/config/ci/providers.json > /tmp/ocm-providers.json
+          echo "providers.json rewritten to /tmp/ocm-providers.json"
       - name: Setup oCIS
         uses: ./.github/actions/ocis-setup
         with:
@@ -560,18 +550,7 @@ print('providers.json rewritten to /tmp/ocm-providers.json')
           docker run -d --name fakeoffice --network host \
             -v "$(pwd):/ocis:ro" \
             python:3-alpine \
-            python3 -c "
-import http.server, pathlib
-body = pathlib.Path('/ocis/tests/config/ci/hosting-discovery.xml').read_bytes()
-class H(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/xml')
-        self.end_headers()
-        self.wfile.write(body)
-    def log_message(self, *a): pass
-http.server.HTTPServer(('', 8080), H).serve_forever()
-"
+            python3 /ocis/tests/config/ci/fakeoffice-server.py
       - name: Start collabora
         run: |
           docker run -d --name collabora --network host \
@@ -587,18 +566,10 @@ http.server.HTTPServer(('', 8080), H).serve_forever()
             -e WOPI_ENABLED=true \
             -e USE_UNAUTHORIZED_STORAGE=true \
             -v "$(pwd)/tests/config/ci/only-office.json:/tmp/only-office.json:ro" \
+            -v "$(pwd)/tests/config/ci/onlyoffice-entrypoint.sh:/entrypoint.sh:ro" \
             --entrypoint /bin/sh \
             onlyoffice/documentserver:9.0.0 \
-            -c "
-set -e
-cp /tmp/only-office.json /etc/onlyoffice/documentserver/local.json
-openssl req -x509 -newkey rsa:4096 -keyout onlyoffice.key -out onlyoffice.crt -sha256 -days 365 -batch -nodes
-mkdir -p /var/www/onlyoffice/Data/certs
-cp onlyoffice.key /var/www/onlyoffice/Data/certs/
-cp onlyoffice.crt /var/www/onlyoffice/Data/certs/
-chmod 400 /var/www/onlyoffice/Data/certs/onlyoffice.key
-/app/ds/run-document-server.sh
-"
+            /entrypoint.sh
       - name: Setup oCIS
         uses: ./.github/actions/ocis-setup
         with:
@@ -966,18 +937,10 @@ chmod 400 /var/www/onlyoffice/Data/certs/onlyoffice.key
 
       - name: Patch web UI config
         run: |
-          python3 -c "
-import json, pathlib
-cfg = json.loads(pathlib.Path('tests/config/ci/ocis-config.json').read_text())
-def patch(obj):
-    if isinstance(obj, dict): return {k: patch(v) for k, v in obj.items()}
-    if isinstance(obj, list): return [patch(v) for v in obj]
-    if isinstance(obj, str): return obj.replace('https://ocis-server:9200', 'https://127.0.0.1:9200')
-    return obj
-out = pathlib.Path('${HOME}/.ocis/config/web-ui-config.json')
-out.write_text(json.dumps(patch(cfg), indent=2))
-print('web config written to', out)
-"
+          sed 's|https://ocis-server:9200|https://127.0.0.1:9200|g' \
+            tests/config/ci/ocis-config.json \
+            > "${HOME}/.ocis/config/web-ui-config.json"
+          echo "web config written to ${HOME}/.ocis/config/web-ui-config.json"
 
       - name: Start oCIS
         run: |
@@ -1148,17 +1111,7 @@ print('web config written to', out)
           LITMUS_BASE="https://${{ steps.ocis.outputs.bridge-ip }}:9200"
 
           # Get personal space ID
-          SPACE_ID=$(curl -sk -uadmin:admin "${OCIS_URL}/graph/v1.0/me/drives" | \
-            python3 -c "
-import json,sys
-drives=json.load(sys.stdin)
-for d in drives.get('value',[]):
-    if d.get('driveType')=='personal':
-        url=d.get('root',{}).get('webDavUrl','')
-        parts=[p for p in url.split('/') if p]
-        print(parts[-1])
-        break
-")
+          SPACE_ID=$(curl -sk -uadmin:admin "${OCIS_URL}/graph/v1.0/me/drives" | python3 -c "import json,sys; drives=json.load(sys.stdin); [print([p for p in d.get('root',{}).get('webDavUrl','').split('/') if p][-1]) for d in drives.get('value',[]) if d.get('driveType')=='personal']")
           echo "SPACE_ID=${SPACE_ID}" >> "$GITHUB_ENV"
           echo "LITMUS_BASE=${LITMUS_BASE}" >> "$GITHUB_ENV"
           echo "Space ID: ${SPACE_ID}"
@@ -1171,9 +1124,7 @@ for d in drives.get('value',[]):
           SHARE_RESP=$(curl -sk -ueinstein:relativity \
             "${OCIS_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares" \
             -d "path=/new_folder&shareType=0&permissions=15&name=new_folder&shareWith=admin")
-          SHARE_ID=$(echo "$SHARE_RESP" | python3 -c "
-import re,sys; m=re.search(r'<id>(.+?)</id>', sys.stdin.read()); print(m.group(1) if m else '')
-")
+          SHARE_ID=$(echo "$SHARE_RESP" | python3 -c "import re,sys; m=re.search(r'<id>(.+?)</id>', sys.stdin.read()); print(m.group(1) if m else '')")
           if [[ -n "$SHARE_ID" ]]; then
             curl -X POST -sk -uadmin:admin \
               "${OCIS_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares/pending/${SHARE_ID}" \
@@ -1275,18 +1226,7 @@ import re,sys; m=re.search(r'<id>(.+?)</id>', sys.stdin.read()); print(m.group(1
             -p 8080:8080 \
             -v "$(pwd):/ocis:ro" \
             python:3-alpine \
-            python3 -c "
-import http.server, pathlib
-body = pathlib.Path('/ocis/tests/config/ci/hosting-discovery.xml').read_bytes()
-class H(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/xml')
-        self.end_headers()
-        self.wfile.write(body)
-    def log_message(self, *a): pass
-http.server.HTTPServer(('', 8080), H).serve_forever()
-"
+            python3 /ocis/tests/config/ci/fakeoffice-server.py
       - name: Get Docker bridge IP
         id: bridge
         run: |
@@ -1428,18 +1368,7 @@ http.server.HTTPServer(('', 8080), H).serve_forever()
             -p 8080:8080 \
             -v "$(pwd):/ocis:ro" \
             python:3-alpine \
-            python3 -c "
-import http.server, pathlib
-body = pathlib.Path('/ocis/tests/config/ci/hosting-discovery.xml').read_bytes()
-class H(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/xml')
-        self.end_headers()
-        self.wfile.write(body)
-    def log_message(self, *a): pass
-http.server.HTTPServer(('', 8080), H).serve_forever()
-"
+            python3 /ocis/tests/config/ci/fakeoffice-server.py
       - name: Get Docker bridge IP
         id: bridge
         run: |
