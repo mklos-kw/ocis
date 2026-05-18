@@ -533,13 +533,24 @@ jobs:
         run: |
           make ci-node-generate
           make -C ocis build
+      - name: Start ClamAV
+        run: |
+          docker run -d --name clamav --network host owncloudci/clamavd
+          echo "Waiting for ClamAV on :3310..."
+          timeout 300 bash -c '
+            while true; do
+              python3 -c "import socket,sys; s=socket.create_connection((\"localhost\",3310),2); s.close()" 2>/dev/null && break
+              sleep 2
+            done
+          '
+          echo "clamav ready."
       - name: Setup oCIS
         uses: ./.github/actions/ocis-setup
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
           email: "true"
-          antivirus: "true"
+          extra-server-env: '{"OCIS_ADD_RUN_SERVICES":"antivirus,notifications","ANTIVIRUS_SCANNER_TYPE":"clamav","ANTIVIRUS_CLAMAV_SOCKET":"tcp://localhost:3310","ANTIVIRUS_DEBUG_ADDR":"0.0.0.0:9277"}'
       - name: Merge expected failures files
         run: |
           cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
