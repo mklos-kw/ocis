@@ -2,8 +2,6 @@ name: Acceptance Tests
 
 on:
   pull_request:
-    paths-ignore:
-      - .github/actions/**
   workflow_dispatch:
 
 jobs:
@@ -96,6 +94,25 @@ jobs:
 
           exit $FAILED
 
+      - name: Build ociswrapper
+        run: make -C tests/ociswrapper build GOWORK=off
+
+      - name: Upload oCIS binary
+        uses: actions/upload-artifact@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.6.2
+        with:
+          name: ocis-binary
+          path: ocis/bin/ocis
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload ociswrapper binary
+        uses: actions/upload-artifact@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.6.2
+        with:
+          name: ociswrapper-binary
+          path: tests/ociswrapper/bin/ociswrapper
+          retention-days: 1
+          if-no-files-found: error
+
   # ---------------------------------------------------------------------------
   # API acceptance tests — split by required services so each group gets a
   # single fixed ocis-setup call with no per-suite conditionals.
@@ -139,24 +156,25 @@ jobs:
           - apiSharingNgLinkShareManagement
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Build oCIS from source
-        run: |
-          make ci-node-generate
-          make -C ocis build
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: ./.github/actions/ocis-setup
         with:
@@ -195,24 +213,25 @@ jobs:
           - apiCors
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Build oCIS from source
-        run: |
-          make ci-node-generate
-          make -C ocis build
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: ./.github/actions/ocis-setup
         with:
@@ -251,24 +270,25 @@ jobs:
           - apiSearchContent
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Build oCIS from source
-        run: |
-          make ci-node-generate
-          make -C ocis build
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: ./.github/actions/ocis-setup
         with:
@@ -300,24 +320,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Build oCIS from source
-        run: |
-          make ci-node-generate
-          make -C ocis build
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: ./.github/actions/ocis-setup
         with:
@@ -349,24 +370,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Build oCIS from source
-        run: |
-          make ci-node-generate
-          make -C ocis build
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: ./.github/actions/ocis-setup
         with:
@@ -398,25 +420,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Build oCIS from source
-        run: |
-          make ci-node-generate
-          make -C ocis build
-          make -C tests/ociswrapper build GOWORK=off
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
       - name: Rewrite providers.json for localhost
         run: |
           sed \
@@ -526,24 +548,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Build oCIS from source
-        run: |
-          make ci-node-generate
-          make -C ocis build
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
       - name: Start fakeoffice
         run: |
           docker run -d --name fakeoffice --network host \
@@ -675,24 +698,25 @@ jobs:
           - cliCommands,apiServiceAvailability   # grouped: both need ClamAV + email services
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Build oCIS from source
-        run: |
-          make ci-node-generate
-          make -C ocis build
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
       - name: Start ClamAV
         run: |
           docker run -d --name clamav --network host owncloudci/clamavd
@@ -749,24 +773,25 @@ jobs:
           - "coreApiWebdavMove1,coreApiWebdavPreviews,coreApiWebdavUpload,coreApiWebdavUploadTUS"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Build oCIS from source
-        run: |
-          make ci-node-generate
-          make -C ocis build
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: ./.github/actions/ocis-setup
         with:
@@ -815,21 +840,25 @@ jobs:
             keycloak: true
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@10.28.1 --activate
-      - name: Generate code
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: ociswrapper-binary
+          path: tests/ociswrapper/bin
+      - name: Mark binaries executable
         run: |
-          pnpm config set store-dir ./.pnpm-store
-          make ci-node-generate
-        env:
-          CHROMEDRIVER_SKIP_DOWNLOAD: "true"
+          chmod +x ocis/bin/ocis
+          chmod +x tests/ociswrapper/bin/ociswrapper
 
       - name: Cache Playwright Chromium
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -895,11 +924,6 @@ jobs:
           timeout 300 bash -c 'until curl -skf https://localhost:9000/health/ready; do sleep 3; done' \
             || (echo "=== keycloak logs ===" && docker logs keycloak --tail 80 && exit 1)
           echo "keycloak ready."
-
-      - name: Build oCIS and ociswrapper
-        run: |
-          make -C ocis build
-          make -C tests/ociswrapper build GOWORK=off
 
       - name: Clone web repo
         run: |
@@ -1092,12 +1116,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         with:
-          go-version-file: go.mod
-          cache: true
-      - name: Build oCIS
-        run: make -C ocis build
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
       - name: Start oCIS
         uses: ./.github/actions/ocis-start-direct
         id: ocis
@@ -1179,12 +1204,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         with:
-          go-version-file: go.mod
-          cache: true
-      - name: Build oCIS
-        run: make -C ocis build
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
       - name: Start oCIS
         uses: ./.github/actions/ocis-start-direct
         id: ocis
@@ -1214,12 +1240,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         with:
-          go-version-file: go.mod
-          cache: true
-      - name: Build oCIS
-        run: make -C ocis build
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
       - name: Start fakeoffice
         run: |
           docker run -d --name wopi-fakeoffice \
@@ -1356,12 +1383,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - name: Download oCIS binary
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         with:
-          go-version-file: go.mod
-          cache: true
-      - name: Build oCIS
-        run: make -C ocis build
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
       - name: Start fakeoffice
         run: |
           docker run -d --name wopi-fakeoffice \
@@ -1466,54 +1494,8 @@ jobs:
           if [[ -f /tmp/ocis-direct.pid ]]; then kill "$(cat /tmp/ocis-direct.pid)" 2>/dev/null || true; fi
           docker rm -f wopi-fakeoffice wopi-cs3server 2>/dev/null || true
 
-  # Validate that the ocis-setup + ocis-test composite actions work in this repo.
-  composite-actions-apiGraph:
-    name: composite-actions-apiGraph
-    needs: [build-and-test]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version: "24"
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
-      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
-        with:
-          php-version: "8.4"
-          extensions: curl, xml, mbstring, zip, ldap, gd
-          tools: composer
-
-      - name: Build oCIS from source
-        run: |
-          make ci-node-generate
-          make -C ocis build
-
-      - name: Setup oCIS
-        uses: ./.github/actions/ocis-setup
-        with:
-          ocis-binary: ocis/bin/ocis
-
-      - name: Test apiGraph
-        uses: ./.github/actions/ocis-test
-        with:
-          suite: apiGraph
-
-      - name: Stop oCIS
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f /tmp/ocis-wrapper.pid ]]; then
-            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
-            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
-          fi
-
   all-acceptance-tests:
-    needs: [api-tests-plain, api-tests-email, api-tests-tika, api-tests-antivirus, api-tests-auth-app, api-tests-ocm, api-tests-wopi, cli-tests, core-api-tests, litmus, cs3api, wopi-builtin, wopi-cs3, e2e-tests, composite-actions-apiGraph]
+    needs: [api-tests-plain, api-tests-email, api-tests-tika, api-tests-antivirus, api-tests-auth-app, api-tests-ocm, api-tests-wopi, cli-tests, core-api-tests, litmus, cs3api, wopi-builtin, wopi-cs3, e2e-tests]
     runs-on: ubuntu-latest
     if: always()
     steps:

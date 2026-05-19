@@ -84,9 +84,13 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/tests/ociswrapper
       run: |
-        GOWORK=off go build -o /tmp/ociswrapper .
-        sudo mv /tmp/ociswrapper /usr/local/bin/ociswrapper
-        echo "ociswrapper built from local source."
+        if command -v ociswrapper &>/dev/null; then
+          echo "ociswrapper already installed: $(ociswrapper --version 2>&1 | head -1)"
+        else
+          GOWORK=off go build -o /tmp/ociswrapper .
+          sudo mv /tmp/ociswrapper /usr/local/bin/ociswrapper
+          echo "ociswrapper built from local source."
+        fi
 
     # -------------------------------------------------------------------------
     # 3. Optional services
