@@ -176,7 +176,7 @@ jobs:
       - name: Mark ociswrapper binary executable
         run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
-        uses: ./.github/actions/ocis-setup
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
@@ -186,7 +186,7 @@ jobs:
               tests/acceptance/expected-failures-without-remotephp.md \
               > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
-        uses: ./.github/actions/ocis-test
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
           expected-failures-file: /tmp/expected-failures.md
@@ -233,7 +233,7 @@ jobs:
       - name: Mark ociswrapper binary executable
         run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
-        uses: ./.github/actions/ocis-setup
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
@@ -244,7 +244,7 @@ jobs:
               tests/acceptance/expected-failures-without-remotephp.md \
               > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
-        uses: ./.github/actions/ocis-test
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
           expected-failures-file: /tmp/expected-failures.md
@@ -290,7 +290,7 @@ jobs:
       - name: Mark ociswrapper binary executable
         run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
-        uses: ./.github/actions/ocis-setup
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
@@ -301,7 +301,7 @@ jobs:
               tests/acceptance/expected-failures-without-remotephp.md \
               > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
-        uses: ./.github/actions/ocis-test
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
           expected-failures-file: /tmp/expected-failures.md
@@ -340,7 +340,7 @@ jobs:
       - name: Mark ociswrapper binary executable
         run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
-        uses: ./.github/actions/ocis-setup
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
@@ -351,7 +351,7 @@ jobs:
               tests/acceptance/expected-failures-without-remotephp.md \
               > /tmp/expected-failures.md
       - name: Test apiAntivirus
-        uses: ./.github/actions/ocis-test
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: apiAntivirus
           expected-failures-file: /tmp/expected-failures.md
@@ -390,7 +390,7 @@ jobs:
       - name: Mark ociswrapper binary executable
         run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
-        uses: ./.github/actions/ocis-setup
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
@@ -401,7 +401,7 @@ jobs:
               tests/acceptance/expected-failures-without-remotephp.md \
               > /tmp/expected-failures.md
       - name: Test apiAuthApp
-        uses: ./.github/actions/ocis-test
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: apiAuthApp
           expected-failures-file: /tmp/expected-failures.md
@@ -447,7 +447,7 @@ jobs:
             tests/config/ci/providers.json > /tmp/ocm-providers.json
           echo "providers.json rewritten to /tmp/ocm-providers.json"
       - name: Setup oCIS
-        uses: ./.github/actions/ocis-setup
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
@@ -523,7 +523,7 @@ jobs:
               tests/acceptance/expected-failures-without-remotephp.md \
               > /tmp/expected-failures.md
       - name: Test apiOcm
-        uses: ./.github/actions/ocis-test
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: apiOcm
           expected-failures-file: /tmp/expected-failures.md
@@ -593,7 +593,7 @@ jobs:
             onlyoffice/documentserver:9.0.0 \
             /entrypoint.sh
       - name: Setup oCIS
-        uses: ./.github/actions/ocis-setup
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
@@ -668,7 +668,7 @@ jobs:
               tests/acceptance/expected-failures-without-remotephp.md \
               > /tmp/expected-failures.md
       - name: Test apiCollaboration
-        uses: ./.github/actions/ocis-test
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: apiCollaboration
           expected-failures-file: /tmp/expected-failures.md
@@ -729,7 +729,7 @@ jobs:
           '
           echo "clamav ready."
       - name: Setup oCIS
-        uses: ./.github/actions/ocis-setup
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
@@ -741,7 +741,7 @@ jobs:
               tests/acceptance/expected-failures-without-remotephp.md \
               > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
-        uses: ./.github/actions/ocis-test
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
           expected-failures-file: /tmp/expected-failures.md
@@ -793,7 +793,7 @@ jobs:
       - name: Mark ociswrapper binary executable
         run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
-        uses: ./.github/actions/ocis-setup
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
           ocis-binary: ocis/bin/ocis
           demo-users: "true"
@@ -801,7 +801,7 @@ jobs:
         run: |
           cp tests/acceptance/expected-failures-API-on-OCIS-storage.md /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
-        uses: ./.github/actions/ocis-test
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
           acceptance-test-type: core-api
@@ -1124,7 +1124,7 @@ jobs:
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
       - name: Start oCIS
-        uses: ./.github/actions/ocis-start-direct
+        uses: mklos-kw/ocis-github-actions/ocis-start-direct@main
         id: ocis
         with:
           ocis-binary: ocis/bin/ocis
@@ -1212,7 +1212,7 @@ jobs:
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
       - name: Start oCIS
-        uses: ./.github/actions/ocis-start-direct
+        uses: mklos-kw/ocis-github-actions/ocis-start-direct@main
         id: ocis
         with:
           ocis-binary: ocis/bin/ocis
@@ -1262,7 +1262,7 @@ jobs:
           echo "ip=${BRIDGE_IP}" >> "$GITHUB_OUTPUT"
           echo "OCIS_BRIDGE_IP=${BRIDGE_IP}" >> "$GITHUB_ENV"
       - name: Start oCIS
-        uses: ./.github/actions/ocis-start-direct
+        uses: mklos-kw/ocis-github-actions/ocis-start-direct@main
         id: ocis
         with:
           ocis-binary: ocis/bin/ocis
@@ -1405,7 +1405,7 @@ jobs:
           echo "ip=${BRIDGE_IP}" >> "$GITHUB_OUTPUT"
           echo "OCIS_BRIDGE_IP=${BRIDGE_IP}" >> "$GITHUB_ENV"
       - name: Start oCIS
-        uses: ./.github/actions/ocis-start-direct
+        uses: mklos-kw/ocis-github-actions/ocis-start-direct@main
         id: ocis
         with:
           ocis-binary: ocis/bin/ocis
