@@ -94,7 +94,31 @@ jobs:
 
           exit $FAILED
 
-  local-api-tests:
+      - name: Build ociswrapper
+        run: make -C tests/ociswrapper build GOWORK=off
+
+      - name: Upload oCIS binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ocis-binary
+          path: ocis/bin/ocis
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload ociswrapper binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ociswrapper-binary
+          path: tests/ociswrapper/bin/ociswrapper
+          retention-days: 1
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # API acceptance tests — split by required services so each group gets a
+  # single fixed ocis-setup call with no per-suite conditionals.
+  # ---------------------------------------------------------------------------
+
+  api-tests-plain:
     name: ${{ matrix.suite }}
     needs: [build-and-test]
     runs-on: ubuntu-latest
@@ -105,10 +129,6 @@ jobs:
           # contract & locks
           - apiContract
           - apiLocks
-          # settings & notifications (needs email)
-          - apiSettings
-          - apiNotification
-          - apiCors
           # graph
           - apiGraphUser
           - apiGraph
@@ -122,10 +142,8 @@ jobs:
           - apiDepthInfinity
           - apiArchiver
           - apiActivities
-          # search
+          # search (no tika)
           - apiSearch1
-          - apiSearch2
-          - apiSearchContent    # needs Tika
           # sharing
           - apiSharingNgShares
           - apiReshare
@@ -136,80 +154,538 @@ jobs:
           - apiSharingNgDriveLinkShare
           - apiSharingNgItemLinkShare
           - apiSharingNgLinkShareManagement
-          # auth
-          - apiAuthApp
-          # antivirus (needs ClamAV)
-          - apiAntivirus
-          # federation (needs email + federation ocis)
-          - apiOcm
-          # collaboration (needs WOPI)
-          - apiCollaboration
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
-
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-
-      - name: Cache libcurl 8.12.0
-        id: cache-libcurl
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          path: /opt/libcurl
-          key: libcurl-8.12.0-${{ runner.os }}
-
-      - name: Install libcurl 8.12.0 build dependencies
-        # Always run: libvips-dev is needed at runtime (govips thumbnails) and for
-        # pkg-config --exists vips to succeed so oCIS is built with ENABLE_VIPS=true.
-        # Skipping this on cache hit would cause oCIS to fall back to the imaging library.
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
+      - name: Setup oCIS
+        uses: ./.github/actions/ocis-setup
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+      - name: Merge expected failures files
         run: |
-          sudo apt-get update -qq
-          # NEEDRESTART_MODE=a: auto-restart services silently; without this, needrestart can fail with exit code 6
-          sudo NEEDRESTART_MODE=a apt-get install -y libssl-dev libnghttp2-dev libpsl-dev libldap-dev libssh-dev zlib1g-dev libvips-dev
-
-      - name: Compile libcurl 8.12.0 from source
-        if: steps.cache-libcurl.outputs.cache-hit != 'true'
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
+      - name: Test ${{ matrix.suite }}
+        uses: ./.github/actions/ocis-test
+        with:
+          suite: ${{ matrix.suite }}
+          expected-failures-file: /tmp/expected-failures.md
+      - name: Stop oCIS
+        if: always()
+        shell: bash
         run: |
-          cd /tmp
-          curl -sLO https://curl.se/download/curl-8.12.0.tar.gz
-          tar xzf curl-8.12.0.tar.gz
-          cd curl-8.12.0
-          ./configure --with-ssl --with-zlib --with-nghttp2 --prefix=/opt/libcurl --enable-versioned-symbols --silent
-          make -j$(nproc) --silent
-          sudo make install --silent
+          if [[ -f /tmp/ocis-wrapper.pid ]]; then
+            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
+            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
+          fi
 
-      - name: Restore libcurl ldconfig
-        # Always run: on cache hit the .so files are restored to /opt/libcurl/lib but
-        # /etc/ld.so.cache on the fresh runner doesn't know about them yet.
-        # Without ldconfig, PHP's curl extension can't find libcurl even though it's present.
+  api-tests-email:
+    name: ${{ matrix.suite }}
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          # settings & notifications (needs Mailpit)
+          - apiSettings
+          - apiNotification
+          - apiCors
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
+        with:
+          php-version: "8.4"
+          extensions: curl, xml, mbstring, zip, ldap, gd
+          tools: composer
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
+      - name: Setup oCIS
+        uses: ./.github/actions/ocis-setup
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+          email: "true"
+      - name: Merge expected failures files
         run: |
-          echo "/opt/libcurl/lib" | sudo tee /etc/ld.so.conf.d/libcurl-8.conf
-          sudo ldconfig
-          /opt/libcurl/bin/curl --version | head -1
-          php -r '
-            $v = curl_version()["version"];
-            echo "PHP curl: $v\n";
-            if (version_compare($v, "8.12.0", "<")) {
-              fwrite(STDERR, "FATAL: PHP sees libcurl $v, need >= 8.12.0\n");
-              exit(1);
-            }
-          '
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
+      - name: Test ${{ matrix.suite }}
+        uses: ./.github/actions/ocis-test
+        with:
+          suite: ${{ matrix.suite }}
+          expected-failures-file: /tmp/expected-failures.md
+      - name: Stop oCIS
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/ocis-wrapper.pid ]]; then
+            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
+            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
+          fi
 
-      - name: Run ${{ matrix.suite }}
-        run: BEHAT_SUITES=${{ matrix.suite }} python3 tests/acceptance/run-github.py
+  api-tests-tika:
+    name: ${{ matrix.suite }}
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          # full-text search (needs Tika)
+          - apiSearch2
+          - apiSearchContent
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
+        with:
+          php-version: "8.4"
+          extensions: curl, xml, mbstring, zip, ldap, gd
+          tools: composer
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
+      - name: Setup oCIS
+        uses: ./.github/actions/ocis-setup
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+          tika: "true"
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
+      - name: Test ${{ matrix.suite }}
+        uses: ./.github/actions/ocis-test
+        with:
+          suite: ${{ matrix.suite }}
+          expected-failures-file: /tmp/expected-failures.md
+      - name: Stop oCIS
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/ocis-wrapper.pid ]]; then
+            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
+            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
+          fi
+
+  api-tests-antivirus:
+    name: apiAntivirus
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
+        with:
+          php-version: "8.4"
+          extensions: curl, xml, mbstring, zip, ldap, gd
+          tools: composer
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
+      - name: Setup oCIS
+        uses: ./.github/actions/ocis-setup
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+          antivirus: "true"
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
+      - name: Test apiAntivirus
+        uses: ./.github/actions/ocis-test
+        with:
+          suite: apiAntivirus
+          expected-failures-file: /tmp/expected-failures.md
+      - name: Stop oCIS
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/ocis-wrapper.pid ]]; then
+            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
+            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
+          fi
+
+  api-tests-auth-app:
+    name: apiAuthApp
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
+        with:
+          php-version: "8.4"
+          extensions: curl, xml, mbstring, zip, ldap, gd
+          tools: composer
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
+      - name: Setup oCIS
+        uses: ./.github/actions/ocis-setup
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+          extra-server-env: '{"OCIS_ADD_RUN_SERVICES":"auth-app","PROXY_ENABLE_APP_AUTH":"true"}'
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
+      - name: Test apiAuthApp
+        uses: ./.github/actions/ocis-test
+        with:
+          suite: apiAuthApp
+          expected-failures-file: /tmp/expected-failures.md
+      - name: Stop oCIS
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/ocis-wrapper.pid ]]; then
+            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
+            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
+          fi
+
+  api-tests-ocm:
+    name: apiOcm
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
+        with:
+          php-version: "8.4"
+          extensions: curl, xml, mbstring, zip, ldap, gd
+          tools: composer
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
+      - name: Rewrite providers.json for localhost
+        run: |
+          sed \
+            -e 's|ocis-server:9200|localhost:9200|g' \
+            -e 's|federation-ocis-server:10200|localhost:10200|g' \
+            tests/config/ci/providers.json > /tmp/ocm-providers.json
+          echo "providers.json rewritten to /tmp/ocm-providers.json"
+      - name: Setup oCIS
+        uses: ./.github/actions/ocis-setup
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+          email: "true"
+          extra-server-env: >-
+            {"OCIS_ADD_RUN_SERVICES":"ocm,notifications","OCIS_ENABLE_OCM":"true",
+            "OCM_OCM_INVITE_MANAGER_INSECURE":"true","OCM_OCM_SHARE_PROVIDER_INSECURE":"true",
+            "OCM_OCM_STORAGE_PROVIDER_INSECURE":"true",
+            "OCM_OCM_PROVIDER_AUTHORIZER_PROVIDERS_FILE":"/tmp/ocm-providers.json",
+            "NOTIFICATIONS_SMTP_HOST":"localhost","NOTIFICATIONS_SMTP_PORT":"1025",
+            "NOTIFICATIONS_SMTP_INSECURE":"true",
+            "NOTIFICATIONS_SMTP_SENDER":"ownCloud <noreply@example.com>",
+            "NOTIFICATIONS_DEBUG_ADDR":"0.0.0.0:9174"}
+      - name: Start federation oCIS
+        run: |
+          FED_CONFIG_DIR="${HOME}/.ocis-federation/config"
+          FED_DATA_DIR="${HOME}/.ocis-federation"
+          mkdir -p "$FED_CONFIG_DIR"
+
+          # Build federation env from .env-federation (source of port/addr truth)
+          FED_ENV=()
+          while IFS= read -r line; do
+            line="${line#export }"
+            line="${line#\!}"
+            [[ -z "$line" || "$line" == \#* ]] && continue
+            FED_ENV+=("$line")
+          done < tests/config/local/.env-federation
+
+          # CI overrides
+          FED_ENV+=("OCIS_URL=https://localhost:10200")
+          FED_ENV+=("OCIS_BASE_DATA_PATH=${FED_DATA_DIR}")
+          FED_ENV+=("OCIS_CONFIG_DIR=${FED_CONFIG_DIR}")
+          FED_ENV+=("OCIS_RUNTIME_PORT=10250")
+          FED_ENV+=("MICRO_REGISTRY_ADDRESS=127.0.0.1:10233")
+          FED_ENV+=("NATS_NATS_PORT=10233")
+          FED_ENV+=("OCIS_EXCLUDE_RUN_SERVICES=idp")
+          FED_ENV+=("STORAGE_USERS_DRIVER=ocis")
+          FED_ENV+=("PROXY_ENABLE_BASIC_AUTH=true")
+          FED_ENV+=("IDM_CREATE_DEMO_USERS=true")
+          FED_ENV+=("IDM_ADMIN_PASSWORD=admin")
+          FED_ENV+=("OCIS_EVENTS_ENABLE_TLS=false")
+          FED_ENV+=("OCIS_JWT_SECRET=some-ocis-jwt-secret")
+          FED_ENV+=("EVENTHISTORY_STORE=memory")
+          FED_ENV+=("OCIS_ADD_RUN_SERVICES=ocm,notifications")
+          FED_ENV+=("OCIS_ENABLE_OCM=true")
+          FED_ENV+=("OCM_OCM_INVITE_MANAGER_INSECURE=true")
+          FED_ENV+=("OCM_OCM_SHARE_PROVIDER_INSECURE=true")
+          FED_ENV+=("OCM_OCM_STORAGE_PROVIDER_INSECURE=true")
+          FED_ENV+=("OCM_OCM_PROVIDER_AUTHORIZER_PROVIDERS_FILE=/tmp/ocm-providers.json")
+          FED_ENV+=("NOTIFICATIONS_SMTP_HOST=localhost")
+          FED_ENV+=("NOTIFICATIONS_SMTP_PORT=1025")
+          FED_ENV+=("NOTIFICATIONS_SMTP_INSECURE=true")
+          FED_ENV+=("NOTIFICATIONS_SMTP_SENDER=ownCloud <noreply@example.com>")
+
+          env "${FED_ENV[@]}" ocis/bin/ocis init --insecure true --config-path "$FED_CONFIG_DIR"
+          cp tests/config/ci/app-registry.yaml "$FED_CONFIG_DIR/app-registry.yaml"
+
+          env "${FED_ENV[@]}" ocis/bin/ocis server > /tmp/ocis-federation.log 2>&1 &
+          echo $! > /tmp/ocis-federation.pid
+          echo "federation oCIS started (PID $(cat /tmp/ocis-federation.pid))"
+
+          echo "Waiting for federation oCIS at https://localhost:10200..."
+          timeout 300 bash -c '
+            until curl -sk -uadmin:admin https://localhost:10200/graph/v1.0/users/admin \
+                  -w "%{http_code}" -o /dev/null 2>/dev/null | grep -q "200"; do
+              sleep 2
+            done
+          ' || (echo "=== federation oCIS failed ===" && cat /tmp/ocis-federation.log | tail -50 && exit 1)
+          echo "federation ocis ready."
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
+      - name: Test apiOcm
+        uses: ./.github/actions/ocis-test
+        with:
+          suite: apiOcm
+          expected-failures-file: /tmp/expected-failures.md
+        env:
+          TEST_SERVER_FED_URL: https://localhost:10200
+      - name: Stop oCIS
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/ocis-wrapper.pid ]]; then
+            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
+            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
+          fi
+          if [[ -f /tmp/ocis-federation.pid ]]; then
+            kill "$(cat /tmp/ocis-federation.pid)" 2>/dev/null || true
+            rm -f /tmp/ocis-federation.pid /tmp/ocis-federation.log
+          fi
+
+  api-tests-wopi:
+    name: apiCollaboration
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
+        with:
+          php-version: "8.4"
+          extensions: curl, xml, mbstring, zip, ldap, gd
+          tools: composer
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
+      - name: Start fakeoffice
+        run: |
+          docker run -d --name fakeoffice --network host \
+            -v "$(pwd):/ocis:ro" \
+            python:3-alpine \
+            python3 /ocis/tests/config/ci/fakeoffice-server.py
+      - name: Start collabora
+        run: |
+          docker run -d --name collabora --network host \
+            -e DONT_GEN_SSL_CERT=set \
+            -e "extra_params=--o:ssl.enable=true --o:ssl.termination=true --o:welcome.enable=false --o:net.frame_ancestors=https://localhost:9200" \
+            --entrypoint /bin/sh \
+            collabora/code:24.04.5.1.1 \
+            -c "set -e; coolconfig generate-proof-key; bash /start-collabora-online.sh"
+      - name: Start onlyoffice
+        run: |
+          sudo systemctl stop postgresql || true
+          docker run -d --name onlyoffice --network host \
+            -e WOPI_ENABLED=true \
+            -e USE_UNAUTHORIZED_STORAGE=true \
+            -v "$(pwd)/tests/config/ci/only-office.json:/tmp/only-office.json:ro" \
+            -v "$(pwd)/tests/config/ci/onlyoffice-entrypoint.sh:/entrypoint.sh:ro" \
+            --entrypoint /bin/sh \
+            onlyoffice/documentserver:9.0.0 \
+            /entrypoint.sh
+      - name: Setup oCIS
+        uses: ./.github/actions/ocis-setup
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+          extra-server-env: '{"GATEWAY_GRPC_ADDR":"0.0.0.0:9142"}'
+      - name: Wait for WOPI app discovery endpoints
+        run: |
+          echo "Waiting for fakeoffice /hosting/discovery..."
+          timeout 300 bash -c 'until curl -sf http://localhost:8080/hosting/discovery; do sleep 2; done'
+          echo "Waiting for collabora /hosting/discovery..."
+          timeout 300 bash -c 'until curl -sfk https://localhost:9980/hosting/discovery; do sleep 2; done'
+          echo "Waiting for onlyoffice /hosting/discovery..."
+          timeout 300 bash -c 'until curl -sfk https://localhost:443/hosting/discovery; do sleep 2; done'
+          echo "All WOPI apps ready."
+      - name: Start collaboration services
+        run: |
+          CONFIG_DIR="${HOME}/.ocis/config"
+          OCIS_BIN="$(pwd)/ocis/bin/ocis"
+
+          declare -A PORTS_COLLAB=(
+            [collabora_grpc]=9301 [collabora_http]=9300 [collabora_debug]=9304
+            [onlyoffice_grpc]=9311 [onlyoffice_http]=9310 [onlyoffice_debug]=9314
+            [fakeoffice_grpc]=9321 [fakeoffice_http]=9320 [fakeoffice_debug]=9324
+          )
+
+          start_collab() {
+            local name=$1 app_name=$2 product=$3 addr=$4 grpc=$5 http=$6 debug=$7
+            env \
+              OCIS_URL="https://localhost:9200" \
+              OCIS_CONFIG_DIR="$CONFIG_DIR" \
+              MICRO_REGISTRY=nats-js-kv \
+              MICRO_REGISTRY_ADDRESS="localhost:9233" \
+              COLLABORATION_LOG_LEVEL=debug \
+              COLLABORATION_GRPC_ADDR="0.0.0.0:${grpc}" \
+              COLLABORATION_HTTP_ADDR="0.0.0.0:${http}" \
+              COLLABORATION_DEBUG_ADDR="0.0.0.0:${debug}" \
+              COLLABORATION_APP_PROOF_DISABLE=true \
+              COLLABORATION_APP_INSECURE=true \
+              COLLABORATION_CS3API_DATAGATEWAY_INSECURE=true \
+              OCIS_JWT_SECRET=some-ocis-jwt-secret \
+              COLLABORATION_WOPI_SECRET=some-wopi-secret \
+              COLLABORATION_APP_NAME="$app_name" \
+              COLLABORATION_APP_PRODUCT="$product" \
+              COLLABORATION_APP_ADDR="$addr" \
+              COLLABORATION_WOPI_SRC="http://localhost:${http}" \
+              "$OCIS_BIN" collaboration server > "/tmp/collab-${name}.log" 2>&1 &
+            echo $! > "/tmp/collab-${name}.pid"
+            echo "collaboration-${name} started (PID $!)"
+          }
+
+          start_collab collabora Collabora Collabora \
+            "https://localhost:9980" \
+            ${PORTS_COLLAB[collabora_grpc]} ${PORTS_COLLAB[collabora_http]} ${PORTS_COLLAB[collabora_debug]}
+          start_collab onlyoffice OnlyOffice OnlyOffice \
+            "https://localhost:443" \
+            ${PORTS_COLLAB[onlyoffice_grpc]} ${PORTS_COLLAB[onlyoffice_http]} ${PORTS_COLLAB[onlyoffice_debug]}
+          start_collab fakeoffice FakeOffice Microsoft \
+            "http://localhost:8080" \
+            ${PORTS_COLLAB[fakeoffice_grpc]} ${PORTS_COLLAB[fakeoffice_http]} ${PORTS_COLLAB[fakeoffice_debug]}
+
+          # Wait for all three healthz endpoints
+          for name in collabora onlyoffice fakeoffice; do
+            key="${name}_debug"
+            port="${PORTS_COLLAB[$key]}"
+            echo "Waiting for collaboration-${name} healthz on :${port}..."
+            timeout 300 bash -c "until curl -sf http://localhost:${port}/healthz; do sleep 2; done" \
+              || (echo "=== collab-${name} log ===" && cat /tmp/collab-${name}.log | tail -30 && exit 1)
+          done
+          echo "All collaboration services ready."
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
+      - name: Test apiCollaboration
+        uses: ./.github/actions/ocis-test
+        with:
+          suite: apiCollaboration
+          expected-failures-file: /tmp/expected-failures.md
+        env:
+          COLLABORATION_SERVICE_URL: http://localhost:9320
+      - name: Stop oCIS and collaboration services
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/ocis-wrapper.pid ]]; then
+            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
+          fi
+          for name in collabora onlyoffice fakeoffice; do
+            if [[ -f "/tmp/collab-${name}.pid" ]]; then
+              kill "$(cat /tmp/collab-${name}.pid)" 2>/dev/null || true
+            fi
+          done
 
   cli-tests:
     needs: [build-and-test]
@@ -222,26 +698,61 @@ jobs:
           - cliCommands,apiServiceAvailability   # grouped: both need ClamAV + email services
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
-
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-
-      - name: Run ${{ matrix.suite }}
-        run: BEHAT_SUITES="${{ matrix.suite }}" python3 tests/acceptance/run-github.py
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
+      - name: Start ClamAV
+        run: |
+          docker run -d --name clamav --network host owncloudci/clamavd
+          echo "Waiting for ClamAV on :3310..."
+          timeout 300 bash -c '
+            while true; do
+              python3 -c "import socket,sys; s=socket.create_connection((\"localhost\",3310),2); s.close()" 2>/dev/null && break
+              sleep 2
+            done
+          '
+          echo "clamav ready."
+      - name: Setup oCIS
+        uses: ./.github/actions/ocis-setup
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+          email: "true"
+          extra-server-env: '{"OCIS_ADD_RUN_SERVICES":"antivirus,notifications","ANTIVIRUS_SCANNER_TYPE":"clamav","ANTIVIRUS_CLAMAV_SOCKET":"tcp://localhost:3310","ANTIVIRUS_DEBUG_ADDR":"0.0.0.0:9277"}'
+      - name: Merge expected failures files
+        run: |
+          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
+              tests/acceptance/expected-failures-without-remotephp.md \
+              > /tmp/expected-failures.md
+      - name: Test ${{ matrix.suite }}
+        uses: ./.github/actions/ocis-test
+        with:
+          suite: ${{ matrix.suite }}
+          expected-failures-file: /tmp/expected-failures.md
+      - name: Stop oCIS
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/ocis-wrapper.pid ]]; then
+            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
+            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
+          fi
 
   core-api-tests:
     name: ${{ matrix.suite }}
@@ -262,74 +773,48 @@ jobs:
           - "coreApiWebdavMove1,coreApiWebdavPreviews,coreApiWebdavUpload,coreApiWebdavUploadTUS"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "24"
-
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
-
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-
-      - name: Cache libcurl 8.12.0
-        id: cache-libcurl
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          path: /opt/libcurl
-          key: libcurl-8.12.0-${{ runner.os }}
-
-      - name: Install libcurl 8.12.0 build dependencies
-        # Always run: libvips-dev is needed at runtime (govips thumbnails) and for
-        # pkg-config --exists vips to succeed so oCIS is built with ENABLE_VIPS=true.
-        # Skipping this on cache hit would cause oCIS to fall back to the imaging library.
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ociswrapper-binary
+          path: /usr/local/bin
+      - name: Mark ociswrapper binary executable
+        run: chmod +x /usr/local/bin/ociswrapper
+      - name: Setup oCIS
+        uses: ./.github/actions/ocis-setup
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+      - name: Merge expected failures files
         run: |
-          sudo apt-get update -qq
-          # NEEDRESTART_MODE=a: auto-restart services silently; without this, needrestart can fail with exit code 6
-          sudo NEEDRESTART_MODE=a apt-get install -y libssl-dev libnghttp2-dev libpsl-dev libldap-dev libssh-dev zlib1g-dev libvips-dev
-
-      - name: Compile libcurl 8.12.0 from source
-        if: steps.cache-libcurl.outputs.cache-hit != 'true'
+          cp tests/acceptance/expected-failures-API-on-OCIS-storage.md /tmp/expected-failures.md
+      - name: Test ${{ matrix.suite }}
+        uses: ./.github/actions/ocis-test
+        with:
+          suite: ${{ matrix.suite }}
+          acceptance-test-type: core-api
+          with-remote-php: "true"
+          expected-failures-file: /tmp/expected-failures.md
+      - name: Stop oCIS
+        if: always()
+        shell: bash
         run: |
-          cd /tmp
-          curl -sLO https://curl.se/download/curl-8.12.0.tar.gz
-          tar xzf curl-8.12.0.tar.gz
-          cd curl-8.12.0
-          ./configure --with-ssl --with-zlib --with-nghttp2 --prefix=/opt/libcurl --enable-versioned-symbols --silent
-          make -j$(nproc) --silent
-          sudo make install --silent
-
-      - name: Restore libcurl ldconfig
-        # Always run: on cache hit the .so files are restored to /opt/libcurl/lib but
-        # /etc/ld.so.cache on the fresh runner doesn't know about them yet.
-        # Without ldconfig, PHP's curl extension can't find libcurl even though it's present.
-        run: |
-          echo "/opt/libcurl/lib" | sudo tee /etc/ld.so.conf.d/libcurl-8.conf
-          sudo ldconfig
-          /opt/libcurl/bin/curl --version | head -1
-          php -r '
-            $v = curl_version()["version"];
-            echo "PHP curl: $v\n";
-            if (version_compare($v, "8.12.0", "<")) {
-              fwrite(STDERR, "FATAL: PHP sees libcurl $v, need >= 8.12.0\n");
-              exit(1);
-            }
-          '
-
-      - name: Run ${{ matrix.suite }}
-        run: >
-          BEHAT_SUITES="${{ matrix.suite }}"
-          ACCEPTANCE_TEST_TYPE=core-api
-          WITH_REMOTE_PHP=true
-          python3 tests/acceptance/run-github.py
+          if [[ -f /tmp/ocis-wrapper.pid ]]; then
+            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
+            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
+          fi
 
   e2e-tests:
     name: e2e-${{ matrix.suite }}
@@ -355,21 +840,25 @@ jobs:
             keycloak: true
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@10.28.1 --activate
-      - name: Generate code
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ocis-binary
+          path: ocis/bin
+      - name: Download ociswrapper binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ociswrapper-binary
+          path: tests/ociswrapper/bin
+      - name: Mark binaries executable
         run: |
-          pnpm config set store-dir ./.pnpm-store
-          make ci-node-generate
-        env:
-          CHROMEDRIVER_SKIP_DOWNLOAD: "true"
+          chmod +x ocis/bin/ocis
+          chmod +x tests/ociswrapper/bin/ociswrapper
 
       - name: Cache Playwright Chromium
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -436,11 +925,190 @@ jobs:
             || (echo "=== keycloak logs ===" && docker logs keycloak --tail 80 && exit 1)
           echo "keycloak ready."
 
+      - name: Clone web repo
+        run: |
+          WEB_BRANCH=$(grep '^WEB_BRANCH=' ci.env | cut -d= -f2- | tr -d '[:space:]')
+          WEB_COMMITID=$(grep '^WEB_COMMITID=' ci.env | cut -d= -f2- | tr -d '[:space:]' || true)
+          WEB_BRANCH="${WEB_BRANCH:-master}"
+          git clone -b "$WEB_BRANCH" --single-branch --no-tags \
+            https://github.com/owncloud/web.git webTestRunner
+          if [[ -n "$WEB_COMMITID" ]]; then
+            git -C webTestRunner checkout "$WEB_COMMITID"
+          fi
+
+      - name: Install web dependencies and Playwright
+        run: |
+          pnpm config set store-dir ./.pnpm-store
+          pnpm install
+          pnpm exec playwright install --with-deps chromium
+        working-directory: webTestRunner
+
+      - name: Init oCIS
+        run: |
+          CONFIG_DIR="${HOME}/.ocis/config"
+          mkdir -p "$CONFIG_DIR"
+          ocis/bin/ocis init --insecure true
+          cp tests/config/ci/app-registry.yaml "$CONFIG_DIR/app-registry.yaml"
+
+      - name: Trust oCIS self-signed cert
+        run: |
+          CERT="${HOME}/.ocis/proxy/server.crt"
+          if [[ -f "$CERT" ]]; then
+            sudo cp "$CERT" /usr/local/share/ca-certificates/ocis.crt
+            sudo update-ca-certificates
+          fi
+
+      - name: Patch web UI config
+        run: |
+          sed 's|https://ocis-server:9200|https://127.0.0.1:9200|g' \
+            tests/config/ci/ocis-config.json \
+            > "${HOME}/.ocis/config/web-ui-config.json"
+          echo "web config written to ${HOME}/.ocis/config/web-ui-config.json"
+
+      - name: Start oCIS
+        run: |
+          CONFIG_DIR="${HOME}/.ocis/config"
+          OCIS_URL="https://127.0.0.1:9200"
+
+          SERVER_ENV=(
+            "OCIS_URL=${OCIS_URL}"
+            "OCIS_CONFIG_DIR=${CONFIG_DIR}"
+            "STORAGE_USERS_DRIVER=ocis"
+            "PROXY_ENABLE_BASIC_AUTH=true"
+            "OCIS_LOG_LEVEL=error"
+            "IDM_CREATE_DEMO_USERS=true"
+            "IDM_ADMIN_PASSWORD=admin"
+            "FRONTEND_SEARCH_MIN_LENGTH=2"
+            "OCIS_ASYNC_UPLOADS=true"
+            "OCIS_EVENTS_ENABLE_TLS=false"
+            "NATS_NATS_HOST=0.0.0.0"
+            "NATS_NATS_PORT=9233"
+            "OCIS_JWT_SECRET=some-ocis-jwt-secret"
+            "EVENTHISTORY_STORE=memory"
+            "OCIS_TRANSLATION_PATH=$(pwd)/tests/config/translations"
+            "WEB_UI_CONFIG_FILE=${HOME}/.ocis/config/web-ui-config.json"
+            "THUMBNAILS_TXT_FONTMAP_FILE=$(pwd)/tests/config/ci/fontsMap.json"
+            "OCIS_PASSWORD_POLICY_BANNED_PASSWORDS_LIST=$(pwd)/tests/config/ci/banned-password-list.txt"
+            "GRAPH_AVAILABLE_ROLES=b1e2218d-eef8-4d4c-b82d-0f1a1b48f3b5,a8d5fe5e-96e3-418d-825b-534dbdf22b99,fb6c3e19-e378-47e5-b277-9732f9de6e21,58c63c02-1d89-4572-916a-870abc5a1b7d,2d00ce52-1fc2-4dbc-8b95-a73b73395f5a,1c996275-f1c9-4e71-abdf-a42f6495e960,312c0871-5ef7-4b3a-85b6-0e4074c64049,aa97fe03-7980-45ac-9e50-b325749fd7e6,63e64e19-8d43-42ec-a738-2b6af2610efa"
+            "FRONTEND_CONFIGURABLE_NOTIFICATIONS=true"
+            "ACTIVITYLOG_DEBUG_ADDR=0.0.0.0:9197"
+            "APP_PROVIDER_DEBUG_ADDR=0.0.0.0:9165"
+            "APP_REGISTRY_DEBUG_ADDR=0.0.0.0:9243"
+            "AUTH_BASIC_DEBUG_ADDR=0.0.0.0:9147"
+            "AUTH_MACHINE_DEBUG_ADDR=0.0.0.0:9167"
+            "AUTH_SERVICE_DEBUG_ADDR=0.0.0.0:9198"
+            "CLIENTLOG_DEBUG_ADDR=0.0.0.0:9260"
+            "EVENTHISTORY_DEBUG_ADDR=0.0.0.0:9270"
+            "FRONTEND_DEBUG_ADDR=0.0.0.0:9141"
+            "GATEWAY_DEBUG_ADDR=0.0.0.0:9143"
+            "GRAPH_DEBUG_ADDR=0.0.0.0:9124"
+            "GROUPS_DEBUG_ADDR=0.0.0.0:9161"
+            "IDM_DEBUG_ADDR=0.0.0.0:9239"
+            "IDP_DEBUG_ADDR=0.0.0.0:9134"
+            "INVITATIONS_DEBUG_ADDR=0.0.0.0:9269"
+            "NATS_DEBUG_ADDR=0.0.0.0:9234"
+            "OCDAV_DEBUG_ADDR=0.0.0.0:9163"
+            "OCM_DEBUG_ADDR=0.0.0.0:9281"
+            "OCS_DEBUG_ADDR=0.0.0.0:9114"
+            "POSTPROCESSING_DEBUG_ADDR=0.0.0.0:9255"
+            "PROXY_DEBUG_ADDR=0.0.0.0:9205"
+            "SEARCH_DEBUG_ADDR=0.0.0.0:9224"
+            "SETTINGS_DEBUG_ADDR=0.0.0.0:9194"
+            "SHARING_DEBUG_ADDR=0.0.0.0:9151"
+            "SSE_DEBUG_ADDR=0.0.0.0:9139"
+            "STORAGE_PUBLICLINK_DEBUG_ADDR=0.0.0.0:9179"
+            "STORAGE_SHARES_DEBUG_ADDR=0.0.0.0:9156"
+            "STORAGE_SYSTEM_DEBUG_ADDR=0.0.0.0:9217"
+            "STORAGE_USERS_DEBUG_ADDR=0.0.0.0:9159"
+            "THUMBNAILS_DEBUG_ADDR=0.0.0.0:9189"
+            "USERLOG_DEBUG_ADDR=0.0.0.0:9214"
+            "USERS_DEBUG_ADDR=0.0.0.0:9145"
+            "WEB_DEBUG_ADDR=0.0.0.0:9104"
+            "WEBDAV_DEBUG_ADDR=0.0.0.0:9119"
+            "WEBFINGER_DEBUG_ADDR=0.0.0.0:9279"
+          )
+
+          if [[ "${{ matrix.tika }}" == "true" ]]; then
+            SERVER_ENV+=(
+              "FRONTEND_FULL_TEXT_SEARCH_ENABLED=true"
+              "SEARCH_EXTRACTOR_TYPE=tika"
+              "SEARCH_EXTRACTOR_TIKA_TIKA_URL=http://localhost:9998"
+              "SEARCH_EXTRACTOR_CS3SOURCE_INSECURE=true"
+            )
+          fi
+
+          if [[ "${{ matrix.keycloak }}" == "true" ]]; then
+            SERVER_ENV+=(
+              "OCIS_EXCLUDE_RUN_SERVICES=idp"
+              "PROXY_AUTOPROVISION_ACCOUNTS=true"
+              "PROXY_ROLE_ASSIGNMENT_DRIVER=oidc"
+              "OCIS_OIDC_ISSUER=https://localhost:8443/realms/oCIS"
+              "PROXY_OIDC_REWRITE_WELLKNOWN=true"
+              "WEB_OIDC_CLIENT_ID=web"
+              "PROXY_USER_OIDC_CLAIM=preferred_username"
+              "PROXY_USER_CS3_CLAIM=username"
+              "OCIS_ADMIN_USER_ID="
+              "GRAPH_ASSIGN_DEFAULT_USER_ROLE=false"
+              "GRAPH_USERNAME_MATCH=none"
+              "PROXY_CSP_CONFIG_FILE_LOCATION=$(pwd)/tests/config/ci/csp.yaml"
+              "KEYCLOAK_DOMAIN=localhost:8443"
+              "IDM_CREATE_DEMO_USERS=false"
+            )
+            env "${SERVER_ENV[@]}" ocis/bin/ocis server > /tmp/ocis-e2e.log 2>&1 &
+          else
+            env "${SERVER_ENV[@]}" tests/ociswrapper/bin/ociswrapper serve \
+              --bin ocis/bin/ocis \
+              --url "$OCIS_URL" \
+              --admin-username admin \
+              --admin-password admin \
+              > /tmp/ocis-e2e.log 2>&1 &
+          fi
+          echo $! > /tmp/ocis-e2e.pid
+          echo "oCIS started (PID $(cat /tmp/ocis-e2e.pid))"
+
+      - name: Wait for oCIS
+        run: |
+          if [[ "${{ matrix.keycloak }}" == "true" ]]; then
+            # Keycloak mode: no local admin user, check openid-configuration
+            timeout 300 bash -c '
+              until curl -sk https://127.0.0.1:9200/.well-known/openid-configuration \
+                    -w "%{http_code}" -o /dev/null 2>/dev/null | grep -q "200"; do
+                sleep 2
+              done
+            ' || (echo "=== oCIS failed ===" && cat /tmp/ocis-e2e.log | tail -50 && exit 1)
+          else
+            timeout 300 bash -c '
+              until curl -sk -uadmin:admin https://127.0.0.1:9200/graph/v1.0/users/admin \
+                    -w "%{http_code}" -o /dev/null 2>/dev/null | grep -q "200"; do
+                sleep 2
+              done
+            ' || (echo "=== oCIS failed ===" && cat /tmp/ocis-e2e.log | tail -50 && exit 1)
+          fi
+          echo "ocis ready."
+
+      - name: Set cert path env
+        run: echo "OCIS_CERT=${HOME}/.ocis/proxy/server.crt" >> "$GITHUB_ENV"
+
       - name: Run e2e-${{ matrix.suite }}
-        run: E2E_ARGS="${{ matrix.args }}" python3 tests/acceptance/run-e2e.py
+        run: bash run-e2e.sh ${{ matrix.args }}
+        working-directory: webTestRunner/tests/e2e
         env:
-          TIKA_NEEDED: ${{ matrix.tika == true && 'true' || 'false' }}
-          KEYCLOAK_NEEDED: ${{ matrix.keycloak == true && 'true' || 'false' }}
+          BASE_URL_OCIS: https://127.0.0.1:9200
+          HEADLESS: "true"
+          RETRY: "3"
+          SKIP_A11Y_TESTS: "true"
+          REPORT_TRACING: "true"
+          NODE_EXTRA_CA_CERTS: ${{ env.OCIS_CERT }}
+          BROWSER: chromium
+          KEYCLOAK: ${{ matrix.keycloak == true && 'true' || 'false' }}
+          KEYCLOAK_HOST: localhost:8443
+
+      - name: Stop oCIS
+        if: always()
+        run: |
+          if [[ -f /tmp/ocis-e2e.pid ]]; then
+            kill "$(cat /tmp/ocis-e2e.pid)" 2>/dev/null || true
+          fi
 
   litmus:
     name: litmus
@@ -448,12 +1116,87 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          go-version-file: go.mod
-          cache: true
-      - name: Run litmus
-        run: python3 tests/acceptance/run-litmus.py
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Start oCIS
+        uses: ./.github/actions/ocis-start-direct
+        id: ocis
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+      - name: Setup for litmus
+        run: |
+          OCIS_URL="https://127.0.0.1:9200"
+          LITMUS_BASE="https://${{ steps.ocis.outputs.bridge-ip }}:9200"
+
+          # Get personal space ID
+          SPACE_ID=$(curl -sk -uadmin:admin "${OCIS_URL}/graph/v1.0/me/drives" | python3 -c "import json,sys; drives=json.load(sys.stdin); [print([p for p in d.get('root',{}).get('webDavUrl','').split('/') if p][-1]) for d in drives.get('value',[]) if d.get('driveType')=='personal']")
+          echo "SPACE_ID=${SPACE_ID}" >> "$GITHUB_ENV"
+          echo "LITMUS_BASE=${LITMUS_BASE}" >> "$GITHUB_ENV"
+          echo "Space ID: ${SPACE_ID}"
+
+          # Create test folder as einstein
+          curl -sk -ueinstein:relativity -X MKCOL \
+            "${OCIS_URL}/remote.php/webdav/new_folder" > /dev/null
+
+          # Share einstein → admin
+          SHARE_RESP=$(curl -sk -ueinstein:relativity \
+            "${OCIS_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares" \
+            -d "path=/new_folder&shareType=0&permissions=15&name=new_folder&shareWith=admin")
+          SHARE_ID=$(echo "$SHARE_RESP" | python3 -c "import re,sys; m=re.search(r'<id>(.+?)</id>', sys.stdin.read()); print(m.group(1) if m else '')")
+          if [[ -n "$SHARE_ID" ]]; then
+            curl -X POST -sk -uadmin:admin \
+              "${OCIS_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares/pending/${SHARE_ID}" \
+              > /dev/null
+          fi
+
+          # Public share
+          curl -sk -ueinstein:relativity \
+            "${OCIS_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares" \
+            -d "path=/new_folder&shareType=3&permissions=15&name=new_folder" > /dev/null
+
+      - name: Run litmus tests
+        run: |
+          LITMUS_IMAGE="owncloudci/litmus:latest"
+          BRIDGE_IP="${OCIS_BRIDGE_IP}"
+          BASE="https://${BRIDGE_IP}:9200"
+          SPACE_ID="${SPACE_ID}"
+          FAILED=()
+
+          run_litmus() {
+            local name=$1 endpoint=$2
+            echo "Testing [${name}]: ${endpoint}"
+            docker run --rm \
+              -e "LITMUS_URL=${endpoint}" \
+              -e LITMUS_USERNAME=admin \
+              -e LITMUS_PASSWORD=admin \
+              -e "TESTS=basic copymove props http" \
+              "$LITMUS_IMAGE" || FAILED+=("$name")
+          }
+
+          run_litmus "old-endpoint"    "${BASE}/remote.php/webdav"
+          run_litmus "new-endpoint"    "${BASE}/remote.php/dav/files/admin"
+          run_litmus "new-shared"      "${BASE}/remote.php/dav/files/admin/Shares/new_folder/"
+          run_litmus "old-shared"      "${BASE}/remote.php/webdav/Shares/new_folder/"
+          run_litmus "spaces-endpoint" "${BASE}/remote.php/dav/spaces/${SPACE_ID}"
+
+          if [[ ${#FAILED[@]} -gt 0 ]]; then
+            echo "Failed: ${FAILED[*]}"
+            exit 1
+          fi
+          echo "All litmus tests passed."
+
+      - name: Stop oCIS
+        if: always()
+        run: |
+          if [[ -f /tmp/ocis-direct.pid ]]; then
+            kill "$(cat /tmp/ocis-direct.pid)" 2>/dev/null || true
+          fi
 
   cs3api:
     name: cs3api
@@ -461,12 +1204,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          go-version-file: go.mod
-          cache: true
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Start oCIS
+        uses: ./.github/actions/ocis-start-direct
+        id: ocis
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+          extra-server-env: >-
+            {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
+            "OCIS_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD":"false"}
       - name: Run cs3api validator
-        run: python3 tests/acceptance/run-cs3api.py
+        run: |
+          docker run --rm \
+            --entrypoint /usr/bin/cs3api-validator \
+            owncloud/cs3api-validator:0.2.1 \
+            /var/lib/cs3api-validator \
+            --endpoint="${OCIS_BRIDGE_IP}:9142"
+      - name: Stop oCIS
+        if: always()
+        run: |
+          if [[ -f /tmp/ocis-direct.pid ]]; then
+            kill "$(cat /tmp/ocis-direct.pid)" 2>/dev/null || true
+          fi
 
   wopi-builtin:
     name: wopi-builtin
@@ -474,12 +1240,142 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          go-version-file: go.mod
-          cache: true
-      - name: Run WOPI validator (builtin)
-        run: python3 tests/acceptance/run-wopi.py --type builtin
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Start fakeoffice
+        run: |
+          docker run -d --name wopi-fakeoffice \
+            -p 8080:8080 \
+            -v "$(pwd):/ocis:ro" \
+            python:3-alpine \
+            python3 /ocis/tests/config/ci/fakeoffice-server.py
+      - name: Get Docker bridge IP
+        id: bridge
+        run: |
+          BRIDGE_IP=$(docker network inspect bridge \
+            --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}')
+          echo "ip=${BRIDGE_IP}" >> "$GITHUB_OUTPUT"
+          echo "OCIS_BRIDGE_IP=${BRIDGE_IP}" >> "$GITHUB_ENV"
+      - name: Start oCIS
+        uses: ./.github/actions/ocis-start-direct
+        id: ocis
+        with:
+          ocis-binary: ocis/bin/ocis
+          exclude-services: "idp,app-provider"
+          extra-server-env: >-
+            {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
+            "APP_PROVIDER_EXTERNAL_ADDR":"com.owncloud.api.app-provider",
+            "APP_PROVIDER_DRIVER":"wopi",
+            "APP_PROVIDER_WOPI_APP_NAME":"FakeOffice",
+            "APP_PROVIDER_WOPI_APP_URL":"http://${{ steps.bridge.outputs.ip }}:8080",
+            "APP_PROVIDER_WOPI_INSECURE":"true",
+            "APP_PROVIDER_WOPI_WOPI_SERVER_EXTERNAL_URL":"http://${{ steps.bridge.outputs.ip }}:9300",
+            "APP_PROVIDER_WOPI_FOLDER_URL_BASE_URL":"https://${{ steps.bridge.outputs.ip }}:9200"}
+      - name: Wait for fakeoffice discovery
+        run: |
+          timeout 300 bash -c "until curl -sf http://localhost:8080/hosting/discovery; do sleep 2; done"
+          echo "fakeoffice discovery ready."
+      - name: Start collaboration service
+        run: |
+          BRIDGE_IP="${OCIS_BRIDGE_IP}"
+          CONFIG_DIR="${HOME}/.ocis/config"
+          env \
+            OCIS_URL="https://${BRIDGE_IP}:9200" \
+            OCIS_CONFIG_DIR="$CONFIG_DIR" \
+            MICRO_REGISTRY=nats-js-kv \
+            MICRO_REGISTRY_ADDRESS="127.0.0.1:9233" \
+            COLLABORATION_LOG_LEVEL=debug \
+            COLLABORATION_GRPC_ADDR="0.0.0.0:9301" \
+            COLLABORATION_HTTP_ADDR="0.0.0.0:9300" \
+            COLLABORATION_DEBUG_ADDR="0.0.0.0:9304" \
+            COLLABORATION_APP_PROOF_DISABLE=true \
+            COLLABORATION_APP_INSECURE=true \
+            COLLABORATION_CS3API_DATAGATEWAY_INSECURE=true \
+            OCIS_JWT_SECRET=some-ocis-jwt-secret \
+            COLLABORATION_WOPI_SECRET=some-wopi-secret \
+            COLLABORATION_APP_NAME=FakeOffice \
+            COLLABORATION_APP_PRODUCT=Microsoft \
+            COLLABORATION_APP_ADDR="http://${BRIDGE_IP}:8080" \
+            COLLABORATION_WOPI_SRC="http://${BRIDGE_IP}:9300" \
+            ocis/bin/ocis collaboration server > /tmp/collab-wopi.log 2>&1 &
+          echo $! > /tmp/collab-wopi.pid
+          echo "Waiting for collaboration service healthz on :9304..."
+          timeout 120 bash -c 'until curl -sf http://localhost:9304/healthz; do sleep 2; done' \
+            || (cat /tmp/collab-wopi.log | tail -30 && exit 1)
+          echo "collaboration service ready."
+      - name: Prepare test file and run WOPI validator
+        run: |
+          BRIDGE_IP="${OCIS_BRIDGE_IP}"
+          OCIS_URL="https://127.0.0.1:9200"
+          VALIDATOR_IMAGE="owncloudci/wopi-validator"
+
+          # PUT test file
+          curl -sk -uadmin:admin -X PUT \
+            --fail --retry-connrefused --retry 7 --retry-all-errors \
+            "${OCIS_URL}/remote.php/webdav/test.wopitest" \
+            -D /tmp/wopi-headers.txt
+
+          # Extract file ID
+          FILE_ID=$(grep -i 'Oc-Fileid:' /tmp/wopi-headers.txt | sed 's/.*: *//' | tr -d '\r\n ')
+          echo "FILE_ID=${FILE_ID}"
+
+          # Open app
+          OPEN=$(curl -sk -uadmin:admin -X POST --fail \
+            --retry-connrefused --retry 7 --retry-all-errors \
+            "${OCIS_URL}/app/open?app_name=FakeOffice&file_id=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('${FILE_ID}', safe=''))")")
+          echo "open: ${OPEN:0:400}"
+
+          ACCESS_TOKEN=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['form_parameters']['access_token'])")
+          TTL=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['form_parameters']['access_token_ttl'])")
+          APP_URL=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('app_url',''))")
+          if echo "$APP_URL" | grep -q 'files%2F'; then
+            FILE_ID_ENC=$(echo "$APP_URL" | sed 's/.*files%2F//')
+          elif echo "$APP_URL" | grep -q 'files/'; then
+            FILE_ID_ENC=$(echo "$APP_URL" | sed 's/.*files\///')
+          else
+            FILE_ID_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('${FILE_ID}', safe=''))")
+          fi
+          WOPI_SRC="http://${BRIDGE_IP}:9300/wopi/files/${FILE_ID_ENC}"
+          echo "WOPI_SRC=${WOPI_SRC}"
+
+          FAILED=()
+          SHARED_GROUPS=(BaseWopiViewing CheckFileInfoSchema EditFlows Locks AccessTokens GetLock ExtendedLockLength FileVersion Features)
+          BUILTIN_GROUPS=(PutRelativeFile RenameFileIfCreateChildFileIsNotSupported)
+
+          for group in "${SHARED_GROUPS[@]}"; do
+            echo "Running testgroup [${group}]"
+            docker run --rm --workdir /app \
+              --entrypoint /app/Microsoft.Office.WopiValidator \
+              "$VALIDATOR_IMAGE" \
+              -t "$ACCESS_TOKEN" -w "$WOPI_SRC" -l "$TTL" --testgroup "$group" \
+              || FAILED+=("$group")
+          done
+
+          for group in "${BUILTIN_GROUPS[@]}"; do
+            echo "Running testgroup [${group}] (secure)"
+            docker run --rm --workdir /app \
+              --entrypoint /app/Microsoft.Office.WopiValidator \
+              "$VALIDATOR_IMAGE" \
+              -s -t "$ACCESS_TOKEN" -w "$WOPI_SRC" -l "$TTL" --testgroup "$group" \
+              || FAILED+=("$group")
+          done
+
+          if [[ ${#FAILED[@]} -gt 0 ]]; then
+            echo "Failed testgroups: ${FAILED[*]}"
+            exit 1
+          fi
+          echo "All WOPI validator tests passed."
+      - name: Stop oCIS and collaboration service
+        if: always()
+        run: |
+          if [[ -f /tmp/ocis-direct.pid ]]; then kill "$(cat /tmp/ocis-direct.pid)" 2>/dev/null || true; fi
+          if [[ -f /tmp/collab-wopi.pid ]]; then kill "$(cat /tmp/collab-wopi.pid)" 2>/dev/null || true; fi
+          docker rm -f wopi-fakeoffice 2>/dev/null || true
 
   wopi-cs3:
     name: wopi-cs3
@@ -487,15 +1383,119 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - name: Download oCIS binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          go-version-file: go.mod
-          cache: true
-      - name: Run WOPI validator (cs3)
-        run: python3 tests/acceptance/run-wopi.py --type cs3
+          name: ocis-binary
+          path: ocis/bin
+      - name: Mark oCIS binary executable
+        run: chmod +x ocis/bin/ocis
+      - name: Start fakeoffice
+        run: |
+          docker run -d --name wopi-fakeoffice \
+            -p 8080:8080 \
+            -v "$(pwd):/ocis:ro" \
+            python:3-alpine \
+            python3 /ocis/tests/config/ci/fakeoffice-server.py
+      - name: Get Docker bridge IP
+        id: bridge
+        run: |
+          BRIDGE_IP=$(docker network inspect bridge \
+            --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}')
+          echo "ip=${BRIDGE_IP}" >> "$GITHUB_OUTPUT"
+          echo "OCIS_BRIDGE_IP=${BRIDGE_IP}" >> "$GITHUB_ENV"
+      - name: Start oCIS
+        uses: ./.github/actions/ocis-start-direct
+        id: ocis
+        with:
+          ocis-binary: ocis/bin/ocis
+          extra-server-env: >-
+            {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
+            "APP_PROVIDER_EXTERNAL_ADDR":"com.owncloud.api.app-provider",
+            "APP_PROVIDER_DRIVER":"wopi",
+            "APP_PROVIDER_WOPI_APP_NAME":"FakeOffice",
+            "APP_PROVIDER_WOPI_APP_URL":"http://${{ steps.bridge.outputs.ip }}:8080",
+            "APP_PROVIDER_WOPI_INSECURE":"true",
+            "APP_PROVIDER_WOPI_WOPI_SERVER_EXTERNAL_URL":"http://${{ steps.bridge.outputs.ip }}:9300",
+            "APP_PROVIDER_WOPI_FOLDER_URL_BASE_URL":"https://${{ steps.bridge.outputs.ip }}:9200"}
+      - name: Wait for fakeoffice discovery
+        run: |
+          timeout 300 bash -c "until curl -sf http://localhost:8080/hosting/discovery; do sleep 2; done"
+          echo "fakeoffice discovery ready."
+      - name: Start cs3 wopi server
+        run: |
+          BRIDGE_IP="${OCIS_BRIDGE_IP}"
+          sed "s|ocis-server|${BRIDGE_IP}|g" tests/config/ci/wopiserver.conf > /tmp/wopiserver-patched.conf
+          echo "123" > /tmp/wopisecret
+
+          docker run -d --name wopi-cs3server \
+            -p 9300:9300 \
+            -v "/tmp/wopiserver-patched.conf:/etc/wopi/wopiserver.conf" \
+            -v "/tmp/wopisecret:/etc/wopi/wopisecret" \
+            --entrypoint /app/wopiserver.py \
+            cs3org/wopiserver:v10.4.0
+
+          echo "Waiting for cs3 wopi server on :9300..."
+          timeout 120 bash -c "
+            until python3 -c \"import socket,sys; s=socket.create_connection(('${BRIDGE_IP}',9300),2); s.close()\" 2>/dev/null; do sleep 2; done
+          "
+          echo "cs3 wopi server ready."
+      - name: Prepare test file and run WOPI validator
+        run: |
+          BRIDGE_IP="${OCIS_BRIDGE_IP}"
+          OCIS_URL="https://127.0.0.1:9200"
+          VALIDATOR_IMAGE="owncloudci/wopi-validator"
+
+          curl -sk -uadmin:admin -X PUT \
+            --fail --retry-connrefused --retry 7 --retry-all-errors \
+            "${OCIS_URL}/remote.php/webdav/test.wopitest" \
+            -D /tmp/wopi-headers.txt
+
+          FILE_ID=$(grep -i 'Oc-Fileid:' /tmp/wopi-headers.txt | sed 's/.*: *//' | tr -d '\r\n ')
+          echo "FILE_ID=${FILE_ID}"
+
+          OPEN=$(curl -sk -uadmin:admin -X POST --fail \
+            --retry-connrefused --retry 7 --retry-all-errors \
+            "${OCIS_URL}/app/open?app_name=FakeOffice&file_id=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('${FILE_ID}', safe=''))")")
+
+          ACCESS_TOKEN=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['form_parameters']['access_token'])")
+          TTL=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['form_parameters']['access_token_ttl'])")
+          APP_URL=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('app_url',''))")
+          if echo "$APP_URL" | grep -q 'files%2F'; then
+            FILE_ID_ENC=$(echo "$APP_URL" | sed 's/.*files%2F//')
+          elif echo "$APP_URL" | grep -q 'files/'; then
+            FILE_ID_ENC=$(echo "$APP_URL" | sed 's/.*files\///')
+          else
+            FILE_ID_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('${FILE_ID}', safe=''))")
+          fi
+          WOPI_SRC="http://${BRIDGE_IP}:9300/wopi/files/${FILE_ID_ENC}"
+          echo "WOPI_SRC=${WOPI_SRC}"
+
+          FAILED=()
+          SHARED_GROUPS=(BaseWopiViewing CheckFileInfoSchema EditFlows Locks AccessTokens GetLock ExtendedLockLength FileVersion Features)
+
+          for group in "${SHARED_GROUPS[@]}"; do
+            echo "Running testgroup [${group}]"
+            docker run --rm --workdir /app \
+              --entrypoint /app/Microsoft.Office.WopiValidator \
+              "$VALIDATOR_IMAGE" \
+              -t "$ACCESS_TOKEN" -w "$WOPI_SRC" -l "$TTL" --testgroup "$group" \
+              || FAILED+=("$group")
+          done
+
+          if [[ ${#FAILED[@]} -gt 0 ]]; then
+            echo "Failed testgroups: ${FAILED[*]}"
+            exit 1
+          fi
+          echo "All WOPI validator tests passed."
+      - name: Stop oCIS and cs3 server
+        if: always()
+        run: |
+          if [[ -f /tmp/ocis-direct.pid ]]; then kill "$(cat /tmp/ocis-direct.pid)" 2>/dev/null || true; fi
+          docker rm -f wopi-fakeoffice wopi-cs3server 2>/dev/null || true
 
   all-acceptance-tests:
-    needs: [local-api-tests, cli-tests, core-api-tests, litmus, cs3api, wopi-builtin, wopi-cs3, e2e-tests]
+    needs: [api-tests-plain, api-tests-email, api-tests-tika, api-tests-antivirus, api-tests-auth-app, api-tests-ocm, api-tests-wopi, cli-tests, core-api-tests, litmus, cs3api, wopi-builtin, wopi-cs3, e2e-tests]
     runs-on: ubuntu-latest
     if: always()
     steps:
