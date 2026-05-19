@@ -98,7 +98,7 @@ jobs:
         run: make -C tests/ociswrapper build GOWORK=off
 
       - name: Upload oCIS binary
-        uses: actions/upload-artifact@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ocis-binary
           path: ocis/bin/ocis
@@ -106,7 +106,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload ociswrapper binary
-        uses: actions/upload-artifact@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ociswrapper-binary
           path: tests/ociswrapper/bin/ociswrapper
@@ -162,14 +162,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
       - name: Download ociswrapper binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ociswrapper-binary
           path: /usr/local/bin
@@ -219,14 +219,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
       - name: Download ociswrapper binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ociswrapper-binary
           path: /usr/local/bin
@@ -276,14 +276,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
       - name: Download ociswrapper binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ociswrapper-binary
           path: /usr/local/bin
@@ -326,14 +326,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
       - name: Download ociswrapper binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ociswrapper-binary
           path: /usr/local/bin
@@ -376,14 +376,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
       - name: Download ociswrapper binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ociswrapper-binary
           path: /usr/local/bin
@@ -426,14 +426,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
       - name: Download ociswrapper binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ociswrapper-binary
           path: /usr/local/bin
@@ -554,14 +554,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
       - name: Download ociswrapper binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ociswrapper-binary
           path: /usr/local/bin
@@ -704,14 +704,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
       - name: Download ociswrapper binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ociswrapper-binary
           path: /usr/local/bin
@@ -779,14 +779,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
       - name: Download ociswrapper binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ociswrapper-binary
           path: /usr/local/bin
@@ -846,12 +846,12 @@ jobs:
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@10.28.1 --activate
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
       - name: Download ociswrapper binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ociswrapper-binary
           path: tests/ociswrapper/bin
@@ -1117,7 +1117,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
@@ -1205,7 +1205,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
@@ -1241,7 +1241,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
@@ -1384,7 +1384,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Download oCIS binary
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ocis-binary
           path: ocis/bin
