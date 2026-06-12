@@ -845,6 +845,12 @@ jobs:
           node-version: "24"
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@10.28.1 --activate
+      - name: Generate code
+        run: |
+          pnpm config set store-dir ./.pnpm-store
+          make ci-node-generate
+        env:
+          CHROMEDRIVER_SKIP_DOWNLOAD: "true"
       - name: Download oCIS binary
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -854,11 +860,11 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ociswrapper-binary
-          path: tests/ociswrapper/bin
+          path: /usr/local/bin
       - name: Mark binaries executable
         run: |
           chmod +x ocis/bin/ocis
-          chmod +x tests/ociswrapper/bin/ociswrapper
+          chmod +x /usr/local/bin/ociswrapper
 
       - name: Cache Playwright Chromium
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -874,56 +880,9 @@ jobs:
           timeout 120 bash -c 'until curl -sf http://localhost:9998; do sleep 2; done'
           echo "tika ready."
 
-      # --- Keycloak (keycloak suite only) ---
-      - name: Generate Keycloak certs
+      - name: Setup Keycloak
         if: matrix.keycloak == true
-        run: |
-          mkdir -p keycloak-certs
-          openssl req -x509 -newkey rsa:2048 \
-            -keyout keycloak-certs/keycloakkey.pem \
-            -out keycloak-certs/keycloakcrt.pem \
-            -nodes -days 365 -subj '/CN=keycloak'
-          chmod -R 777 keycloak-certs
-
-      - name: Start Postgres
-        if: matrix.keycloak == true
-        run: |
-          docker run -d --name postgres --network host \
-            -e POSTGRES_DB=keycloak \
-            -e POSTGRES_USER=keycloak \
-            -e POSTGRES_PASSWORD=keycloak \
-            postgres:alpine3.18
-          timeout 30 bash -c 'until docker exec postgres pg_isready -U keycloak; do sleep 1; done'
-
-      - name: Start Keycloak
-        if: matrix.keycloak == true
-        run: |
-          # Patch realm: ocis-ci-realm.dist.json uses ocis-server:9200 as hostname.
-          # GitHub Actions runs on the host network so patch it to 127.0.0.1.
-          sed 's|https://ocis-server:9200|https://127.0.0.1:9200|g' \
-            tests/config/ci/ocis-ci-realm.dist.json > /tmp/ocis-realm.json
-          docker run -d --name keycloak --network host \
-            -e OCIS_DOMAIN=https://127.0.0.1:9200 \
-            -e KC_HOSTNAME=localhost \
-            -e KC_PORT=8443 \
-            -e KC_DB=postgres \
-            -e "KC_DB_URL=jdbc:postgresql://localhost:5432/keycloak" \
-            -e KC_DB_USERNAME=keycloak \
-            -e KC_DB_PASSWORD=keycloak \
-            -e KC_FEATURES=impersonation \
-            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
-            -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
-            -e KC_HTTPS_CERTIFICATE_FILE=/keycloak-certs/keycloakcrt.pem \
-            -e KC_HTTPS_CERTIFICATE_KEY_FILE=/keycloak-certs/keycloakkey.pem \
-            -v "$(pwd)/keycloak-certs:/keycloak-certs:ro" \
-            -v "/tmp/ocis-realm.json:/opt/keycloak/data/import/oCIS-realm.json:ro" \
-            quay.io/keycloak/keycloak:26.2.5 \
-            start-dev --proxy-headers xforwarded \
-              --spi-connections-http-client-default-disable-trust-manager=true \
-              --import-realm --health-enabled=true
-          timeout 300 bash -c 'until curl -skf https://localhost:9000/health/ready; do sleep 3; done' \
-            || (echo "=== keycloak logs ===" && docker logs keycloak --tail 80 && exit 1)
-          echo "keycloak ready."
+        uses: mklos-kw/ocis-github-actions/ocis-keycloak-setup@main
 
       - name: Clone web repo
         run: |
@@ -943,12 +902,62 @@ jobs:
           pnpm exec playwright install --with-deps chromium
         working-directory: webTestRunner
 
-      - name: Init oCIS
+      - name: Patch web UI config
         run: |
-          CONFIG_DIR="${HOME}/.ocis/config"
-          mkdir -p "$CONFIG_DIR"
-          ocis/bin/ocis init --insecure true
-          cp tests/config/ci/app-registry.yaml "$CONFIG_DIR/app-registry.yaml"
+          mkdir -p "${HOME}/.ocis/config"
+          sed 's|https://ocis-server:9200|https://127.0.0.1:9200|g' \
+            tests/config/ci/ocis-config.json \
+            > "${HOME}/.ocis/config/web-ui-config.json"
+
+      - name: Setup oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary: ocis/bin/ocis
+          demo-users: "true"
+          tika: ${{ matrix.tika == true && 'true' || 'false' }}
+          keycloak: ${{ matrix.keycloak == true && 'true' || 'false' }}
+          extra-server-env: >-
+            {"OCIS_TRANSLATION_PATH":"${{ github.workspace }}/tests/config/translations",
+            "WEB_UI_CONFIG_FILE":"${{ env.HOME }}/.ocis/config/web-ui-config.json",
+            "THUMBNAILS_TXT_FONTMAP_FILE":"${{ github.workspace }}/tests/config/ci/fontsMap.json",
+            "OCIS_PASSWORD_POLICY_BANNED_PASSWORDS_LIST":"${{ github.workspace }}/tests/config/ci/banned-password-list.txt",
+            "GRAPH_AVAILABLE_ROLES":"b1e2218d-eef8-4d4c-b82d-0f1a1b48f3b5,a8d5fe5e-96e3-418d-825b-534dbdf22b99,fb6c3e19-e378-47e5-b277-9732f9de6e21,58c63c02-1d89-4572-916a-870abc5a1b7d,2d00ce52-1fc2-4dbc-8b95-a73b73395f5a,1c996275-f1c9-4e71-abdf-a42f6495e960,312c0871-5ef7-4b3a-85b6-0e4074c64049,aa97fe03-7980-45ac-9e50-b325749fd7e6,63e64e19-8d43-42ec-a738-2b6af2610efa",
+            "FRONTEND_CONFIGURABLE_NOTIFICATIONS":"true",
+            "ACTIVITYLOG_DEBUG_ADDR":"0.0.0.0:9197",
+            "APP_PROVIDER_DEBUG_ADDR":"0.0.0.0:9165",
+            "APP_REGISTRY_DEBUG_ADDR":"0.0.0.0:9243",
+            "AUTH_BASIC_DEBUG_ADDR":"0.0.0.0:9147",
+            "AUTH_MACHINE_DEBUG_ADDR":"0.0.0.0:9167",
+            "AUTH_SERVICE_DEBUG_ADDR":"0.0.0.0:9198",
+            "CLIENTLOG_DEBUG_ADDR":"0.0.0.0:9260",
+            "EVENTHISTORY_DEBUG_ADDR":"0.0.0.0:9270",
+            "FRONTEND_DEBUG_ADDR":"0.0.0.0:9141",
+            "GATEWAY_DEBUG_ADDR":"0.0.0.0:9143",
+            "GRAPH_DEBUG_ADDR":"0.0.0.0:9124",
+            "GROUPS_DEBUG_ADDR":"0.0.0.0:9161",
+            "IDM_DEBUG_ADDR":"0.0.0.0:9239",
+            "IDP_DEBUG_ADDR":"0.0.0.0:9134",
+            "INVITATIONS_DEBUG_ADDR":"0.0.0.0:9269",
+            "NATS_DEBUG_ADDR":"0.0.0.0:9234",
+            "OCDAV_DEBUG_ADDR":"0.0.0.0:9163",
+            "OCM_DEBUG_ADDR":"0.0.0.0:9281",
+            "OCS_DEBUG_ADDR":"0.0.0.0:9114",
+            "POSTPROCESSING_DEBUG_ADDR":"0.0.0.0:9255",
+            "PROXY_DEBUG_ADDR":"0.0.0.0:9205",
+            "SEARCH_DEBUG_ADDR":"0.0.0.0:9224",
+            "SETTINGS_DEBUG_ADDR":"0.0.0.0:9194",
+            "SHARING_DEBUG_ADDR":"0.0.0.0:9151",
+            "SSE_DEBUG_ADDR":"0.0.0.0:9139",
+            "STORAGE_PUBLICLINK_DEBUG_ADDR":"0.0.0.0:9179",
+            "STORAGE_SHARES_DEBUG_ADDR":"0.0.0.0:9156",
+            "STORAGE_SYSTEM_DEBUG_ADDR":"0.0.0.0:9217",
+            "STORAGE_USERS_DEBUG_ADDR":"0.0.0.0:9159",
+            "THUMBNAILS_DEBUG_ADDR":"0.0.0.0:9189",
+            "USERLOG_DEBUG_ADDR":"0.0.0.0:9214",
+            "USERS_DEBUG_ADDR":"0.0.0.0:9145",
+            "WEB_DEBUG_ADDR":"0.0.0.0:9104",
+            "WEBDAV_DEBUG_ADDR":"0.0.0.0:9119",
+            "WEBFINGER_DEBUG_ADDR":"0.0.0.0:9279"}
 
       - name: Trust oCIS self-signed cert
         run: |
@@ -957,134 +966,6 @@ jobs:
             sudo cp "$CERT" /usr/local/share/ca-certificates/ocis.crt
             sudo update-ca-certificates
           fi
-
-      - name: Patch web UI config
-        run: |
-          sed 's|https://ocis-server:9200|https://127.0.0.1:9200|g' \
-            tests/config/ci/ocis-config.json \
-            > "${HOME}/.ocis/config/web-ui-config.json"
-          echo "web config written to ${HOME}/.ocis/config/web-ui-config.json"
-
-      - name: Start oCIS
-        run: |
-          CONFIG_DIR="${HOME}/.ocis/config"
-          OCIS_URL="https://127.0.0.1:9200"
-
-          SERVER_ENV=(
-            "OCIS_URL=${OCIS_URL}"
-            "OCIS_CONFIG_DIR=${CONFIG_DIR}"
-            "STORAGE_USERS_DRIVER=ocis"
-            "PROXY_ENABLE_BASIC_AUTH=true"
-            "OCIS_LOG_LEVEL=error"
-            "IDM_CREATE_DEMO_USERS=true"
-            "IDM_ADMIN_PASSWORD=admin"
-            "FRONTEND_SEARCH_MIN_LENGTH=2"
-            "OCIS_ASYNC_UPLOADS=true"
-            "OCIS_EVENTS_ENABLE_TLS=false"
-            "NATS_NATS_HOST=0.0.0.0"
-            "NATS_NATS_PORT=9233"
-            "OCIS_JWT_SECRET=some-ocis-jwt-secret"
-            "EVENTHISTORY_STORE=memory"
-            "OCIS_TRANSLATION_PATH=$(pwd)/tests/config/translations"
-            "WEB_UI_CONFIG_FILE=${HOME}/.ocis/config/web-ui-config.json"
-            "THUMBNAILS_TXT_FONTMAP_FILE=$(pwd)/tests/config/ci/fontsMap.json"
-            "OCIS_PASSWORD_POLICY_BANNED_PASSWORDS_LIST=$(pwd)/tests/config/ci/banned-password-list.txt"
-            "GRAPH_AVAILABLE_ROLES=b1e2218d-eef8-4d4c-b82d-0f1a1b48f3b5,a8d5fe5e-96e3-418d-825b-534dbdf22b99,fb6c3e19-e378-47e5-b277-9732f9de6e21,58c63c02-1d89-4572-916a-870abc5a1b7d,2d00ce52-1fc2-4dbc-8b95-a73b73395f5a,1c996275-f1c9-4e71-abdf-a42f6495e960,312c0871-5ef7-4b3a-85b6-0e4074c64049,aa97fe03-7980-45ac-9e50-b325749fd7e6,63e64e19-8d43-42ec-a738-2b6af2610efa"
-            "FRONTEND_CONFIGURABLE_NOTIFICATIONS=true"
-            "ACTIVITYLOG_DEBUG_ADDR=0.0.0.0:9197"
-            "APP_PROVIDER_DEBUG_ADDR=0.0.0.0:9165"
-            "APP_REGISTRY_DEBUG_ADDR=0.0.0.0:9243"
-            "AUTH_BASIC_DEBUG_ADDR=0.0.0.0:9147"
-            "AUTH_MACHINE_DEBUG_ADDR=0.0.0.0:9167"
-            "AUTH_SERVICE_DEBUG_ADDR=0.0.0.0:9198"
-            "CLIENTLOG_DEBUG_ADDR=0.0.0.0:9260"
-            "EVENTHISTORY_DEBUG_ADDR=0.0.0.0:9270"
-            "FRONTEND_DEBUG_ADDR=0.0.0.0:9141"
-            "GATEWAY_DEBUG_ADDR=0.0.0.0:9143"
-            "GRAPH_DEBUG_ADDR=0.0.0.0:9124"
-            "GROUPS_DEBUG_ADDR=0.0.0.0:9161"
-            "IDM_DEBUG_ADDR=0.0.0.0:9239"
-            "IDP_DEBUG_ADDR=0.0.0.0:9134"
-            "INVITATIONS_DEBUG_ADDR=0.0.0.0:9269"
-            "NATS_DEBUG_ADDR=0.0.0.0:9234"
-            "OCDAV_DEBUG_ADDR=0.0.0.0:9163"
-            "OCM_DEBUG_ADDR=0.0.0.0:9281"
-            "OCS_DEBUG_ADDR=0.0.0.0:9114"
-            "POSTPROCESSING_DEBUG_ADDR=0.0.0.0:9255"
-            "PROXY_DEBUG_ADDR=0.0.0.0:9205"
-            "SEARCH_DEBUG_ADDR=0.0.0.0:9224"
-            "SETTINGS_DEBUG_ADDR=0.0.0.0:9194"
-            "SHARING_DEBUG_ADDR=0.0.0.0:9151"
-            "SSE_DEBUG_ADDR=0.0.0.0:9139"
-            "STORAGE_PUBLICLINK_DEBUG_ADDR=0.0.0.0:9179"
-            "STORAGE_SHARES_DEBUG_ADDR=0.0.0.0:9156"
-            "STORAGE_SYSTEM_DEBUG_ADDR=0.0.0.0:9217"
-            "STORAGE_USERS_DEBUG_ADDR=0.0.0.0:9159"
-            "THUMBNAILS_DEBUG_ADDR=0.0.0.0:9189"
-            "USERLOG_DEBUG_ADDR=0.0.0.0:9214"
-            "USERS_DEBUG_ADDR=0.0.0.0:9145"
-            "WEB_DEBUG_ADDR=0.0.0.0:9104"
-            "WEBDAV_DEBUG_ADDR=0.0.0.0:9119"
-            "WEBFINGER_DEBUG_ADDR=0.0.0.0:9279"
-          )
-
-          if [[ "${{ matrix.tika }}" == "true" ]]; then
-            SERVER_ENV+=(
-              "FRONTEND_FULL_TEXT_SEARCH_ENABLED=true"
-              "SEARCH_EXTRACTOR_TYPE=tika"
-              "SEARCH_EXTRACTOR_TIKA_TIKA_URL=http://localhost:9998"
-              "SEARCH_EXTRACTOR_CS3SOURCE_INSECURE=true"
-            )
-          fi
-
-          if [[ "${{ matrix.keycloak }}" == "true" ]]; then
-            SERVER_ENV+=(
-              "OCIS_EXCLUDE_RUN_SERVICES=idp"
-              "PROXY_AUTOPROVISION_ACCOUNTS=true"
-              "PROXY_ROLE_ASSIGNMENT_DRIVER=oidc"
-              "OCIS_OIDC_ISSUER=https://localhost:8443/realms/oCIS"
-              "PROXY_OIDC_REWRITE_WELLKNOWN=true"
-              "WEB_OIDC_CLIENT_ID=web"
-              "PROXY_USER_OIDC_CLAIM=preferred_username"
-              "PROXY_USER_CS3_CLAIM=username"
-              "OCIS_ADMIN_USER_ID="
-              "GRAPH_ASSIGN_DEFAULT_USER_ROLE=false"
-              "GRAPH_USERNAME_MATCH=none"
-              "PROXY_CSP_CONFIG_FILE_LOCATION=$(pwd)/tests/config/ci/csp.yaml"
-              "KEYCLOAK_DOMAIN=localhost:8443"
-              "IDM_CREATE_DEMO_USERS=false"
-            )
-            env "${SERVER_ENV[@]}" ocis/bin/ocis server > /tmp/ocis-e2e.log 2>&1 &
-          else
-            env "${SERVER_ENV[@]}" tests/ociswrapper/bin/ociswrapper serve \
-              --bin ocis/bin/ocis \
-              --url "$OCIS_URL" \
-              --admin-username admin \
-              --admin-password admin \
-              > /tmp/ocis-e2e.log 2>&1 &
-          fi
-          echo $! > /tmp/ocis-e2e.pid
-          echo "oCIS started (PID $(cat /tmp/ocis-e2e.pid))"
-
-      - name: Wait for oCIS
-        run: |
-          if [[ "${{ matrix.keycloak }}" == "true" ]]; then
-            # Keycloak mode: no local admin user, check openid-configuration
-            timeout 300 bash -c '
-              until curl -sk https://127.0.0.1:9200/.well-known/openid-configuration \
-                    -w "%{http_code}" -o /dev/null 2>/dev/null | grep -q "200"; do
-                sleep 2
-              done
-            ' || (echo "=== oCIS failed ===" && cat /tmp/ocis-e2e.log | tail -50 && exit 1)
-          else
-            timeout 300 bash -c '
-              until curl -sk -uadmin:admin https://127.0.0.1:9200/graph/v1.0/users/admin \
-                    -w "%{http_code}" -o /dev/null 2>/dev/null | grep -q "200"; do
-                sleep 2
-              done
-            ' || (echo "=== oCIS failed ===" && cat /tmp/ocis-e2e.log | tail -50 && exit 1)
-          fi
-          echo "ocis ready."
 
       - name: Set cert path env
         run: echo "OCIS_CERT=${HOME}/.ocis/proxy/server.crt" >> "$GITHUB_ENV"
@@ -1106,8 +987,8 @@ jobs:
       - name: Stop oCIS
         if: always()
         run: |
-          if [[ -f /tmp/ocis-e2e.pid ]]; then
-            kill "$(cat /tmp/ocis-e2e.pid)" 2>/dev/null || true
+          if [[ -f /tmp/ocis-wrapper.pid ]]; then
+            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
           fi
 
   litmus:
@@ -1247,67 +1128,12 @@ jobs:
           path: ocis/bin
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
-      - name: Start fakeoffice
-        run: |
-          docker run -d --name wopi-fakeoffice \
-            -p 8080:8080 \
-            -v "$(pwd):/ocis:ro" \
-            python:3-alpine \
-            python3 /ocis/tests/config/ci/fakeoffice-server.py
-      - name: Get Docker bridge IP
-        id: bridge
-        run: |
-          BRIDGE_IP=$(docker network inspect bridge \
-            --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}')
-          echo "ip=${BRIDGE_IP}" >> "$GITHUB_OUTPUT"
-          echo "OCIS_BRIDGE_IP=${BRIDGE_IP}" >> "$GITHUB_ENV"
-      - name: Start oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-start-direct@main
-        id: ocis
+      - name: Setup WOPI (builtin)
+        id: wopi
+        uses: mklos-kw/ocis-github-actions/ocis-wopi-setup@main
         with:
           ocis-binary: ocis/bin/ocis
-          exclude-services: "idp,app-provider"
-          extra-server-env: >-
-            {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
-            "APP_PROVIDER_EXTERNAL_ADDR":"com.owncloud.api.app-provider",
-            "APP_PROVIDER_DRIVER":"wopi",
-            "APP_PROVIDER_WOPI_APP_NAME":"FakeOffice",
-            "APP_PROVIDER_WOPI_APP_URL":"http://${{ steps.bridge.outputs.ip }}:8080",
-            "APP_PROVIDER_WOPI_INSECURE":"true",
-            "APP_PROVIDER_WOPI_WOPI_SERVER_EXTERNAL_URL":"http://${{ steps.bridge.outputs.ip }}:9300",
-            "APP_PROVIDER_WOPI_FOLDER_URL_BASE_URL":"https://${{ steps.bridge.outputs.ip }}:9200"}
-      - name: Wait for fakeoffice discovery
-        run: |
-          timeout 300 bash -c "until curl -sf http://localhost:8080/hosting/discovery; do sleep 2; done"
-          echo "fakeoffice discovery ready."
-      - name: Start collaboration service
-        run: |
-          BRIDGE_IP="${OCIS_BRIDGE_IP}"
-          CONFIG_DIR="${HOME}/.ocis/config"
-          env \
-            OCIS_URL="https://${BRIDGE_IP}:9200" \
-            OCIS_CONFIG_DIR="$CONFIG_DIR" \
-            MICRO_REGISTRY=nats-js-kv \
-            MICRO_REGISTRY_ADDRESS="127.0.0.1:9233" \
-            COLLABORATION_LOG_LEVEL=debug \
-            COLLABORATION_GRPC_ADDR="0.0.0.0:9301" \
-            COLLABORATION_HTTP_ADDR="0.0.0.0:9300" \
-            COLLABORATION_DEBUG_ADDR="0.0.0.0:9304" \
-            COLLABORATION_APP_PROOF_DISABLE=true \
-            COLLABORATION_APP_INSECURE=true \
-            COLLABORATION_CS3API_DATAGATEWAY_INSECURE=true \
-            OCIS_JWT_SECRET=some-ocis-jwt-secret \
-            COLLABORATION_WOPI_SECRET=some-wopi-secret \
-            COLLABORATION_APP_NAME=FakeOffice \
-            COLLABORATION_APP_PRODUCT=Microsoft \
-            COLLABORATION_APP_ADDR="http://${BRIDGE_IP}:8080" \
-            COLLABORATION_WOPI_SRC="http://${BRIDGE_IP}:9300" \
-            ocis/bin/ocis collaboration server > /tmp/collab-wopi.log 2>&1 &
-          echo $! > /tmp/collab-wopi.pid
-          echo "Waiting for collaboration service healthz on :9304..."
-          timeout 120 bash -c 'until curl -sf http://localhost:9304/healthz; do sleep 2; done' \
-            || (cat /tmp/collab-wopi.log | tail -30 && exit 1)
-          echo "collaboration service ready."
+          server-type: builtin
       - name: Prepare test file and run WOPI validator
         run: |
           BRIDGE_IP="${OCIS_BRIDGE_IP}"
@@ -1390,56 +1216,12 @@ jobs:
           path: ocis/bin
       - name: Mark oCIS binary executable
         run: chmod +x ocis/bin/ocis
-      - name: Start fakeoffice
-        run: |
-          docker run -d --name wopi-fakeoffice \
-            -p 8080:8080 \
-            -v "$(pwd):/ocis:ro" \
-            python:3-alpine \
-            python3 /ocis/tests/config/ci/fakeoffice-server.py
-      - name: Get Docker bridge IP
-        id: bridge
-        run: |
-          BRIDGE_IP=$(docker network inspect bridge \
-            --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}')
-          echo "ip=${BRIDGE_IP}" >> "$GITHUB_OUTPUT"
-          echo "OCIS_BRIDGE_IP=${BRIDGE_IP}" >> "$GITHUB_ENV"
-      - name: Start oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-start-direct@main
-        id: ocis
+      - name: Setup WOPI (cs3)
+        id: wopi
+        uses: mklos-kw/ocis-github-actions/ocis-wopi-setup@main
         with:
           ocis-binary: ocis/bin/ocis
-          extra-server-env: >-
-            {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
-            "APP_PROVIDER_EXTERNAL_ADDR":"com.owncloud.api.app-provider",
-            "APP_PROVIDER_DRIVER":"wopi",
-            "APP_PROVIDER_WOPI_APP_NAME":"FakeOffice",
-            "APP_PROVIDER_WOPI_APP_URL":"http://${{ steps.bridge.outputs.ip }}:8080",
-            "APP_PROVIDER_WOPI_INSECURE":"true",
-            "APP_PROVIDER_WOPI_WOPI_SERVER_EXTERNAL_URL":"http://${{ steps.bridge.outputs.ip }}:9300",
-            "APP_PROVIDER_WOPI_FOLDER_URL_BASE_URL":"https://${{ steps.bridge.outputs.ip }}:9200"}
-      - name: Wait for fakeoffice discovery
-        run: |
-          timeout 300 bash -c "until curl -sf http://localhost:8080/hosting/discovery; do sleep 2; done"
-          echo "fakeoffice discovery ready."
-      - name: Start cs3 wopi server
-        run: |
-          BRIDGE_IP="${OCIS_BRIDGE_IP}"
-          sed "s|ocis-server|${BRIDGE_IP}|g" tests/config/ci/wopiserver.conf > /tmp/wopiserver-patched.conf
-          echo "123" > /tmp/wopisecret
-
-          docker run -d --name wopi-cs3server \
-            -p 9300:9300 \
-            -v "/tmp/wopiserver-patched.conf:/etc/wopi/wopiserver.conf" \
-            -v "/tmp/wopisecret:/etc/wopi/wopisecret" \
-            --entrypoint /app/wopiserver.py \
-            cs3org/wopiserver:v10.4.0
-
-          echo "Waiting for cs3 wopi server on :9300..."
-          timeout 120 bash -c "
-            until python3 -c \"import socket,sys; s=socket.create_connection(('${BRIDGE_IP}',9300),2); s.close()\" 2>/dev/null; do sleep 2; done
-          "
-          echo "cs3 wopi server ready."
+          server-type: cs3
       - name: Prepare test file and run WOPI validator
         run: |
           BRIDGE_IP="${OCIS_BRIDGE_IP}"
