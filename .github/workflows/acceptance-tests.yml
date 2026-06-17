@@ -302,13 +302,14 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Rewrite providers.json for localhost
+      - name: Patch OCM providers.json — replace Docker hostnames with localhost for CI
         run: |
+          # providers.json uses Docker Compose hostnames (ocis-server, federation-ocis-server).
+          # In CI both instances run on localhost at ports 9200/10200.
           sed \
             -e 's|ocis-server:9200|localhost:9200|g' \
             -e 's|federation-ocis-server:10200|localhost:10200|g' \
             tests/config/ci/providers.json > /tmp/ocm-providers.json
-          echo "providers.json rewritten to /tmp/ocm-providers.json"
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
