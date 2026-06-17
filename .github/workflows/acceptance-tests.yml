@@ -916,6 +916,7 @@ jobs:
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
           ocis-binary: ocis/bin/ocis
+          ocis-url: "https://127.0.0.1:9200"
           demo-users: "true"
           tika: ${{ matrix.tika == true && 'true' || 'false' }}
           keycloak: ${{ matrix.keycloak == true && 'true' || 'false' }}
