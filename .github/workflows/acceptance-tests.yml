@@ -337,6 +337,7 @@ jobs:
           skip-test-runner-setup: "true"
           pid-file: /tmp/ocis-federation.pid
           log-file: /tmp/ocis-federation.log
+          debug-port-offset: "1000"
           extra-server-env: >-
             {"OCIS_BASE_DATA_PATH":"/home/runner/.ocis-federation",
             "OCIS_RUNTIME_PORT":"10250",
