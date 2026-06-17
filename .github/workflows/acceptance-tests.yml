@@ -401,17 +401,6 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Start ClamAV
-        run: |
-          docker run -d --name clamav --network host owncloudci/clamavd
-          echo "Waiting for ClamAV on :3310..."
-          timeout 300 bash -c '
-            while true; do
-              python3 -c "import socket,sys; s=socket.create_connection((\"localhost\",3310),2); s.close()" 2>/dev/null && break
-              sleep 2
-            done
-          '
-          echo "clamav ready."
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
@@ -419,7 +408,7 @@ jobs:
           ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           email: "true"
-          extra-server-env: '{"OCIS_ADD_RUN_SERVICES":"antivirus,notifications","ANTIVIRUS_SCANNER_TYPE":"clamav","ANTIVIRUS_CLAMAV_SOCKET":"tcp://localhost:3310","ANTIVIRUS_DEBUG_ADDR":"0.0.0.0:9277"}'
+          antivirus: "true"
       - name: Test ${{ matrix.suite }}
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
