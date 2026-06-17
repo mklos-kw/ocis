@@ -874,14 +874,6 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ hashFiles('ci.env') }}
 
-      # --- Tika (search suite only) ---
-      - name: Start Tika
-        if: matrix.tika == true
-        run: |
-          docker run -d --name tika --network host apache/tika:3.2.2.0-full
-          timeout 120 bash -c 'until curl -sf http://localhost:9998; do sleep 2; done'
-          echo "tika ready."
-
       - name: Setup Keycloak
         if: matrix.keycloak == true
         uses: mklos-kw/ocis-github-actions/ocis-keycloak-setup@main
