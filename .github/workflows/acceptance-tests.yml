@@ -183,14 +183,6 @@ jobs:
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
-      - name: Stop oCIS
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f /tmp/ocis-wrapper.pid ]]; then
-            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
-            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
-          fi
 
   api-tests-email:
     name: ${{ matrix.suite }}
@@ -222,14 +214,6 @@ jobs:
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
-      - name: Stop oCIS
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f /tmp/ocis-wrapper.pid ]]; then
-            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
-            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
-          fi
 
   api-tests-tika:
     name: ${{ matrix.suite }}
@@ -260,14 +244,6 @@ jobs:
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
-      - name: Stop oCIS
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f /tmp/ocis-wrapper.pid ]]; then
-            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
-            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
-          fi
 
   api-tests-antivirus:
     name: apiAntivirus
@@ -291,14 +267,6 @@ jobs:
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: apiAntivirus
-      - name: Stop oCIS
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f /tmp/ocis-wrapper.pid ]]; then
-            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
-            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
-          fi
 
   api-tests-auth-app:
     name: apiAuthApp
@@ -322,14 +290,6 @@ jobs:
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: apiAuthApp
-      - name: Stop oCIS
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f /tmp/ocis-wrapper.pid ]]; then
-            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
-            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
-          fi
 
   api-tests-ocm:
     name: apiOcm
@@ -427,18 +387,6 @@ jobs:
           suite: apiOcm
         env:
           TEST_SERVER_FED_URL: https://localhost:10200
-      - name: Stop oCIS
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f /tmp/ocis-wrapper.pid ]]; then
-            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
-            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
-          fi
-          if [[ -f /tmp/ocis-federation.pid ]]; then
-            kill "$(cat /tmp/ocis-federation.pid)" 2>/dev/null || true
-            rm -f /tmp/ocis-federation.pid /tmp/ocis-federation.log
-          fi
 
   api-tests-wopi:
     name: apiCollaboration
@@ -553,18 +501,6 @@ jobs:
           suite: apiCollaboration
         env:
           COLLABORATION_SERVICE_URL: http://localhost:9320
-      - name: Stop oCIS and collaboration services
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f /tmp/ocis-wrapper.pid ]]; then
-            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
-          fi
-          for name in collabora onlyoffice fakeoffice; do
-            if [[ -f "/tmp/collab-${name}.pid" ]]; then
-              kill "$(cat /tmp/collab-${name}.pid)" 2>/dev/null || true
-            fi
-          done
 
   cli-tests:
     needs: [build-and-test]
@@ -605,14 +541,6 @@ jobs:
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
-      - name: Stop oCIS
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f /tmp/ocis-wrapper.pid ]]; then
-            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
-            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
-          fi
 
   core-api-tests:
     name: ${{ matrix.suite }}
@@ -650,14 +578,6 @@ jobs:
           suite: ${{ matrix.suite }}
           acceptance-test-type: core-api
           with-remote-php: "true"
-      - name: Stop oCIS
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f /tmp/ocis-wrapper.pid ]]; then
-            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
-            rm -f /tmp/ocis-wrapper.pid /tmp/ocis-server.log
-          fi
 
   e2e-tests:
     name: e2e-${{ matrix.suite }}
@@ -809,12 +729,6 @@ jobs:
           KEYCLOAK: ${{ matrix.keycloak == true && 'true' || 'false' }}
           KEYCLOAK_HOST: localhost:8443
 
-      - name: Stop oCIS
-        if: always()
-        run: |
-          if [[ -f /tmp/ocis-wrapper.pid ]]; then
-            kill "$(cat /tmp/ocis-wrapper.pid)" 2>/dev/null || true
-          fi
 
   litmus:
     name: litmus
@@ -891,12 +805,6 @@ jobs:
           fi
           echo "All litmus tests passed."
 
-      - name: Stop oCIS
-        if: always()
-        run: |
-          if [[ -f /tmp/ocis-direct.pid ]]; then
-            kill "$(cat /tmp/ocis-direct.pid)" 2>/dev/null || true
-          fi
 
   cs3api:
     name: cs3api
@@ -920,12 +828,6 @@ jobs:
             owncloud/cs3api-validator:0.2.1 \
             /var/lib/cs3api-validator \
             --endpoint="${OCIS_BRIDGE_IP}:9142"
-      - name: Stop oCIS
-        if: always()
-        run: |
-          if [[ -f /tmp/ocis-direct.pid ]]; then
-            kill "$(cat /tmp/ocis-direct.pid)" 2>/dev/null || true
-          fi
 
   wopi-builtin:
     name: wopi-builtin
@@ -1001,12 +903,6 @@ jobs:
             exit 1
           fi
           echo "All WOPI validator tests passed."
-      - name: Stop oCIS and collaboration service
-        if: always()
-        run: |
-          if [[ -f /tmp/ocis-direct.pid ]]; then kill "$(cat /tmp/ocis-direct.pid)" 2>/dev/null || true; fi
-          if [[ -f /tmp/collab-wopi.pid ]]; then kill "$(cat /tmp/collab-wopi.pid)" 2>/dev/null || true; fi
-          docker rm -f wopi-fakeoffice 2>/dev/null || true
 
   wopi-cs3:
     name: wopi-cs3
@@ -1068,11 +964,6 @@ jobs:
             exit 1
           fi
           echo "All WOPI validator tests passed."
-      - name: Stop oCIS and cs3 server
-        if: always()
-        run: |
-          if [[ -f /tmp/ocis-direct.pid ]]; then kill "$(cat /tmp/ocis-direct.pid)" 2>/dev/null || true; fi
-          docker rm -f wopi-fakeoffice wopi-cs3server 2>/dev/null || true
 
   all-acceptance-tests:
     needs: [unit-tests, api-tests-plain, api-tests-email, api-tests-tika, api-tests-antivirus, api-tests-auth-app, api-tests-ocm, api-tests-wopi, cli-tests, core-api-tests, litmus, cs3api, wopi-builtin, wopi-cs3, e2e-tests]
