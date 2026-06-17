@@ -173,35 +173,16 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
-      - name: Download ociswrapper binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ociswrapper-binary
-          path: /usr/local/bin
-      - name: Mark ociswrapper binary executable
-        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
-      - name: Merge expected failures files
-        run: |
-          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
-              tests/acceptance/expected-failures-without-remotephp.md \
-              > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
-          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -230,36 +211,17 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
-      - name: Download ociswrapper binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ociswrapper-binary
-          path: /usr/local/bin
-      - name: Mark ociswrapper binary executable
-        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           email: "true"
-      - name: Merge expected failures files
-        run: |
-          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
-              tests/acceptance/expected-failures-without-remotephp.md \
-              > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
-          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -287,36 +249,17 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
-      - name: Download ociswrapper binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ociswrapper-binary
-          path: /usr/local/bin
-      - name: Mark ociswrapper binary executable
-        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           tika: "true"
-      - name: Merge expected failures files
-        run: |
-          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
-              tests/acceptance/expected-failures-without-remotephp.md \
-              > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
-          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -337,36 +280,17 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
-      - name: Download ociswrapper binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ociswrapper-binary
-          path: /usr/local/bin
-      - name: Mark ociswrapper binary executable
-        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           antivirus: "true"
-      - name: Merge expected failures files
-        run: |
-          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
-              tests/acceptance/expected-failures-without-remotephp.md \
-              > /tmp/expected-failures.md
       - name: Test apiAntivirus
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: apiAntivirus
-          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -387,36 +311,17 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
-      - name: Download ociswrapper binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ociswrapper-binary
-          path: /usr/local/bin
-      - name: Mark ociswrapper binary executable
-        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           extra-server-env: '{"OCIS_ADD_RUN_SERVICES":"auth-app","PROXY_ENABLE_APP_AUTH":"true"}'
-      - name: Merge expected failures files
-        run: |
-          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
-              tests/acceptance/expected-failures-without-remotephp.md \
-              > /tmp/expected-failures.md
       - name: Test apiAuthApp
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: apiAuthApp
-          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -437,20 +342,6 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
-      - name: Download ociswrapper binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ociswrapper-binary
-          path: /usr/local/bin
-      - name: Mark ociswrapper binary executable
-        run: chmod +x /usr/local/bin/ociswrapper
       - name: Rewrite providers.json for localhost
         run: |
           sed \
@@ -461,7 +352,8 @@ jobs:
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           email: "true"
           extra-server-env: >-
@@ -529,16 +421,10 @@ jobs:
             done
           ' || (echo "=== federation oCIS failed ===" && cat /tmp/ocis-federation.log | tail -50 && exit 1)
           echo "federation ocis ready."
-      - name: Merge expected failures files
-        run: |
-          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
-              tests/acceptance/expected-failures-without-remotephp.md \
-              > /tmp/expected-failures.md
       - name: Test apiOcm
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: apiOcm
-          expected-failures-file: /tmp/expected-failures.md
         env:
           TEST_SERVER_FED_URL: https://localhost:10200
       - name: Stop oCIS
@@ -565,20 +451,6 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
-      - name: Download ociswrapper binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ociswrapper-binary
-          path: /usr/local/bin
-      - name: Mark ociswrapper binary executable
-        run: chmod +x /usr/local/bin/ociswrapper
       - name: Start fakeoffice
         run: |
           docker run -d --name fakeoffice --network host \
@@ -607,7 +479,8 @@ jobs:
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           extra-server-env: '{"GATEWAY_GRPC_ADDR":"0.0.0.0:9142"}'
       - name: Wait for WOPI app discovery endpoints
@@ -674,16 +547,10 @@ jobs:
               || (echo "=== collab-${name} log ===" && cat /tmp/collab-${name}.log | tail -30 && exit 1)
           done
           echo "All collaboration services ready."
-      - name: Merge expected failures files
-        run: |
-          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
-              tests/acceptance/expected-failures-without-remotephp.md \
-              > /tmp/expected-failures.md
       - name: Test apiCollaboration
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: apiCollaboration
-          expected-failures-file: /tmp/expected-failures.md
         env:
           COLLABORATION_SERVICE_URL: http://localhost:9320
       - name: Stop oCIS and collaboration services
@@ -715,20 +582,6 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
-      - name: Download ociswrapper binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ociswrapper-binary
-          path: /usr/local/bin
-      - name: Mark ociswrapper binary executable
-        run: chmod +x /usr/local/bin/ociswrapper
       - name: Start ClamAV
         run: |
           docker run -d --name clamav --network host owncloudci/clamavd
@@ -743,20 +596,15 @@ jobs:
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           email: "true"
           extra-server-env: '{"OCIS_ADD_RUN_SERVICES":"antivirus,notifications","ANTIVIRUS_SCANNER_TYPE":"clamav","ANTIVIRUS_CLAMAV_SOCKET":"tcp://localhost:3310","ANTIVIRUS_DEBUG_ADDR":"0.0.0.0:9277"}'
-      - name: Merge expected failures files
-        run: |
-          cat tests/acceptance/expected-failures-localAPI-on-OCIS-storage.md \
-              tests/acceptance/expected-failures-without-remotephp.md \
-              > /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
-          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -790,35 +638,18 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
-      - name: Download ociswrapper binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ociswrapper-binary
-          path: /usr/local/bin
-      - name: Mark ociswrapper binary executable
-        run: chmod +x /usr/local/bin/ociswrapper
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
-      - name: Merge expected failures files
-        run: |
-          cp tests/acceptance/expected-failures-API-on-OCIS-storage.md /tmp/expected-failures.md
       - name: Test ${{ matrix.suite }}
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
           suite: ${{ matrix.suite }}
           acceptance-test-type: core-api
           with-remote-php: "true"
-          expected-failures-file: /tmp/expected-failures.md
       - name: Stop oCIS
         if: always()
         shell: bash
@@ -865,21 +696,6 @@ jobs:
           make ci-node-generate
         env:
           CHROMEDRIVER_SKIP_DOWNLOAD: "true"
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Download ociswrapper binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ociswrapper-binary
-          path: /usr/local/bin
-      - name: Mark binaries executable
-        run: |
-          chmod +x ocis/bin/ocis
-          chmod +x /usr/local/bin/ociswrapper
-
       - name: Cache Playwright Chromium
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -919,7 +735,8 @@ jobs:
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
           ocis-url: "https://127.0.0.1:9200"
           demo-users: "true"
           tika: ${{ matrix.tika == true && 'true' || 'false' }}
@@ -1005,18 +822,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
       - name: Start oCIS
         uses: mklos-kw/ocis-github-actions/ocis-start-direct@main
         id: ocis
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
           demo-users: "true"
           extra-server-env: '{"OCIS_ASYNC_UPLOADS":"false"}'
       - name: Setup for litmus
@@ -1094,18 +904,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
       - name: Start oCIS
         uses: mklos-kw/ocis-github-actions/ocis-start-direct@main
         id: ocis
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
           demo-users: "true"
           extra-server-env: >-
             {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
@@ -1130,18 +933,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
       - name: Setup WOPI (builtin)
         id: wopi
         uses: mklos-kw/ocis-github-actions/ocis-wopi-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
           server-type: builtin
       - name: Prepare test file and run WOPI validator
         run: |
@@ -1218,18 +1014,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Download oCIS binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ocis-binary
-          path: ocis/bin
-      - name: Mark oCIS binary executable
-        run: chmod +x ocis/bin/ocis
       - name: Setup WOPI (cs3)
         id: wopi
         uses: mklos-kw/ocis-github-actions/ocis-wopi-setup@main
         with:
-          ocis-binary: ocis/bin/ocis
+          ocis-binary-artifact: ocis-binary
           server-type: cs3
       - name: Prepare test file and run WOPI validator
         run: |
