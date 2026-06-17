@@ -325,62 +325,32 @@ jobs:
             "NOTIFICATIONS_SMTP_INSECURE":"true",
             "NOTIFICATIONS_SMTP_SENDER":"ownCloud <noreply@example.com>",
             "NOTIFICATIONS_DEBUG_ADDR":"0.0.0.0:9174"}
-      - name: Start federation oCIS
-        run: |
-          FED_CONFIG_DIR="${HOME}/.ocis-federation/config"
-          FED_DATA_DIR="${HOME}/.ocis-federation"
-          mkdir -p "$FED_CONFIG_DIR"
-
-          # Build federation env from .env-federation (source of port/addr truth)
-          FED_ENV=()
-          while IFS= read -r line; do
-            line="${line#export }"
-            line="${line#\!}"
-            [[ -z "$line" || "$line" == \#* ]] && continue
-            FED_ENV+=("$line")
-          done < tests/config/local/.env-federation
-
-          # CI overrides
-          FED_ENV+=("OCIS_URL=https://localhost:10200")
-          FED_ENV+=("OCIS_BASE_DATA_PATH=${FED_DATA_DIR}")
-          FED_ENV+=("OCIS_CONFIG_DIR=${FED_CONFIG_DIR}")
-          FED_ENV+=("OCIS_RUNTIME_PORT=10250")
-          FED_ENV+=("MICRO_REGISTRY_ADDRESS=127.0.0.1:10233")
-          FED_ENV+=("NATS_NATS_PORT=10233")
-          FED_ENV+=("OCIS_EXCLUDE_RUN_SERVICES=idp")
-          FED_ENV+=("STORAGE_USERS_DRIVER=ocis")
-          FED_ENV+=("PROXY_ENABLE_BASIC_AUTH=true")
-          FED_ENV+=("IDM_CREATE_DEMO_USERS=true")
-          FED_ENV+=("IDM_ADMIN_PASSWORD=admin")
-          FED_ENV+=("OCIS_EVENTS_ENABLE_TLS=false")
-          FED_ENV+=("OCIS_JWT_SECRET=some-ocis-jwt-secret")
-          FED_ENV+=("EVENTHISTORY_STORE=memory")
-          FED_ENV+=("OCIS_ADD_RUN_SERVICES=ocm,notifications")
-          FED_ENV+=("OCIS_ENABLE_OCM=true")
-          FED_ENV+=("OCM_OCM_INVITE_MANAGER_INSECURE=true")
-          FED_ENV+=("OCM_OCM_SHARE_PROVIDER_INSECURE=true")
-          FED_ENV+=("OCM_OCM_STORAGE_PROVIDER_INSECURE=true")
-          FED_ENV+=("OCM_OCM_PROVIDER_AUTHORIZER_PROVIDERS_FILE=/tmp/ocm-providers.json")
-          FED_ENV+=("NOTIFICATIONS_SMTP_HOST=localhost")
-          FED_ENV+=("NOTIFICATIONS_SMTP_PORT=1025")
-          FED_ENV+=("NOTIFICATIONS_SMTP_INSECURE=true")
-          FED_ENV+=("NOTIFICATIONS_SMTP_SENDER=ownCloud <noreply@example.com>")
-
-          env "${FED_ENV[@]}" ocis/bin/ocis init --insecure true --config-path "$FED_CONFIG_DIR"
-          cp tests/config/ci/app-registry.yaml "$FED_CONFIG_DIR/app-registry.yaml"
-
-          env "${FED_ENV[@]}" ocis/bin/ocis server > /tmp/ocis-federation.log 2>&1 &
-          echo $! > /tmp/ocis-federation.pid
-          echo "federation oCIS started (PID $(cat /tmp/ocis-federation.pid))"
-
-          echo "Waiting for federation oCIS at https://localhost:10200..."
-          timeout 300 bash -c '
-            until curl -sk -uadmin:admin https://localhost:10200/graph/v1.0/users/admin \
-                  -w "%{http_code}" -o /dev/null 2>/dev/null | grep -q "200"; do
-              sleep 2
-            done
-          ' || (echo "=== federation oCIS failed ===" && cat /tmp/ocis-federation.log | tail -50 && exit 1)
-          echo "federation ocis ready."
+      - name: Setup federation oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary: ocis/bin/ocis
+          ocis-url: "https://localhost:10200"
+          ocis-config-dir: /home/runner/.ocis-federation/config
+          wrapper: "false"
+          demo-users: "true"
+          skip-test-runner-setup: "true"
+          pid-file: /tmp/ocis-federation.pid
+          log-file: /tmp/ocis-federation.log
+          extra-server-env: >-
+            {"OCIS_BASE_DATA_PATH":"/home/runner/.ocis-federation",
+            "OCIS_RUNTIME_PORT":"10250",
+            "NATS_NATS_PORT":"10233",
+            "MICRO_REGISTRY_ADDRESS":"127.0.0.1:10233",
+            "OCIS_EXCLUDE_RUN_SERVICES":"idp",
+            "OCIS_ADD_RUN_SERVICES":"ocm,notifications",
+            "OCIS_ENABLE_OCM":"true",
+            "OCM_OCM_INVITE_MANAGER_INSECURE":"true",
+            "OCM_OCM_SHARE_PROVIDER_INSECURE":"true",
+            "OCM_OCM_STORAGE_PROVIDER_INSECURE":"true",
+            "OCM_OCM_PROVIDER_AUTHORIZER_PROVIDERS_FILE":"/tmp/ocm-providers.json",
+            "NOTIFICATIONS_SMTP_HOST":"localhost","NOTIFICATIONS_SMTP_PORT":"1025",
+            "NOTIFICATIONS_SMTP_INSECURE":"true",
+            "NOTIFICATIONS_SMTP_SENDER":"ownCloud <noreply@example.com>"}
       - name: Test apiOcm
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
