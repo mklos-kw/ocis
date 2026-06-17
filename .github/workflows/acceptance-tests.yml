@@ -369,31 +369,6 @@ jobs:
           php-version: "8.4"
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
-      - name: Start fakeoffice
-        run: |
-          docker run -d --name fakeoffice --network host \
-            -v "$(pwd):/ocis:ro" \
-            python:3-alpine \
-            python3 /ocis/tests/config/ci/fakeoffice-server.py
-      - name: Start collabora
-        run: |
-          docker run -d --name collabora --network host \
-            -e DONT_GEN_SSL_CERT=set \
-            -e "extra_params=--o:ssl.enable=true --o:ssl.termination=true --o:welcome.enable=false --o:net.frame_ancestors=https://localhost:9200" \
-            --entrypoint /bin/sh \
-            collabora/code:24.04.5.1.1 \
-            -c "set -e; coolconfig generate-proof-key; bash /start-collabora-online.sh"
-      - name: Start onlyoffice
-        run: |
-          sudo systemctl stop postgresql || true
-          docker run -d --name onlyoffice --network host \
-            -e WOPI_ENABLED=true \
-            -e USE_UNAUTHORIZED_STORAGE=true \
-            -v "$(pwd)/tests/config/ci/only-office.json:/tmp/only-office.json:ro" \
-            -v "$(pwd)/tests/config/ci/onlyoffice-entrypoint.sh:/entrypoint.sh:ro" \
-            --entrypoint /bin/sh \
-            onlyoffice/documentserver:9.0.0 \
-            /entrypoint.sh
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
@@ -401,70 +376,7 @@ jobs:
           ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           extra-server-env: '{"GATEWAY_GRPC_ADDR":"0.0.0.0:9142"}'
-      - name: Wait for WOPI app discovery endpoints
-        run: |
-          echo "Waiting for fakeoffice /hosting/discovery..."
-          timeout 300 bash -c 'until curl -sf http://localhost:8080/hosting/discovery; do sleep 2; done'
-          echo "Waiting for collabora /hosting/discovery..."
-          timeout 300 bash -c 'until curl -sfk https://localhost:9980/hosting/discovery; do sleep 2; done'
-          echo "Waiting for onlyoffice /hosting/discovery..."
-          timeout 300 bash -c 'until curl -sfk https://localhost:443/hosting/discovery; do sleep 2; done'
-          echo "All WOPI apps ready."
-      - name: Start collaboration services
-        run: |
-          CONFIG_DIR="${HOME}/.ocis/config"
-          OCIS_BIN="$(pwd)/ocis/bin/ocis"
-
-          declare -A PORTS_COLLAB=(
-            [collabora_grpc]=9301 [collabora_http]=9300 [collabora_debug]=9304
-            [onlyoffice_grpc]=9311 [onlyoffice_http]=9310 [onlyoffice_debug]=9314
-            [fakeoffice_grpc]=9321 [fakeoffice_http]=9320 [fakeoffice_debug]=9324
-          )
-
-          start_collab() {
-            local name=$1 app_name=$2 product=$3 addr=$4 grpc=$5 http=$6 debug=$7
-            env \
-              OCIS_URL="https://localhost:9200" \
-              OCIS_CONFIG_DIR="$CONFIG_DIR" \
-              MICRO_REGISTRY=nats-js-kv \
-              MICRO_REGISTRY_ADDRESS="localhost:9233" \
-              COLLABORATION_LOG_LEVEL=debug \
-              COLLABORATION_GRPC_ADDR="0.0.0.0:${grpc}" \
-              COLLABORATION_HTTP_ADDR="0.0.0.0:${http}" \
-              COLLABORATION_DEBUG_ADDR="0.0.0.0:${debug}" \
-              COLLABORATION_APP_PROOF_DISABLE=true \
-              COLLABORATION_APP_INSECURE=true \
-              COLLABORATION_CS3API_DATAGATEWAY_INSECURE=true \
-              OCIS_JWT_SECRET=some-ocis-jwt-secret \
-              COLLABORATION_WOPI_SECRET=some-wopi-secret \
-              COLLABORATION_APP_NAME="$app_name" \
-              COLLABORATION_APP_PRODUCT="$product" \
-              COLLABORATION_APP_ADDR="$addr" \
-              COLLABORATION_WOPI_SRC="http://localhost:${http}" \
-              "$OCIS_BIN" collaboration server > "/tmp/collab-${name}.log" 2>&1 &
-            echo $! > "/tmp/collab-${name}.pid"
-            echo "collaboration-${name} started (PID $!)"
-          }
-
-          start_collab collabora Collabora Collabora \
-            "https://localhost:9980" \
-            ${PORTS_COLLAB[collabora_grpc]} ${PORTS_COLLAB[collabora_http]} ${PORTS_COLLAB[collabora_debug]}
-          start_collab onlyoffice OnlyOffice OnlyOffice \
-            "https://localhost:443" \
-            ${PORTS_COLLAB[onlyoffice_grpc]} ${PORTS_COLLAB[onlyoffice_http]} ${PORTS_COLLAB[onlyoffice_debug]}
-          start_collab fakeoffice FakeOffice Microsoft \
-            "http://localhost:8080" \
-            ${PORTS_COLLAB[fakeoffice_grpc]} ${PORTS_COLLAB[fakeoffice_http]} ${PORTS_COLLAB[fakeoffice_debug]}
-
-          # Wait for all three healthz endpoints
-          for name in collabora onlyoffice fakeoffice; do
-            key="${name}_debug"
-            port="${PORTS_COLLAB[$key]}"
-            echo "Waiting for collaboration-${name} healthz on :${port}..."
-            timeout 300 bash -c "until curl -sf http://localhost:${port}/healthz; do sleep 2; done" \
-              || (echo "=== collab-${name} log ===" && cat /tmp/collab-${name}.log | tail -30 && exit 1)
-          done
-          echo "All collaboration services ready."
+          collaboration-apps: "collabora,onlyoffice,fakeoffice"
       - name: Test apiCollaboration
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
