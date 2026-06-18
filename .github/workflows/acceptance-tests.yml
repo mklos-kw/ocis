@@ -263,6 +263,7 @@ jobs:
           ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           antivirus: "true"
+          extra-server-env: '{"POSTPROCESSING_STEPS":"virusscan"}'
       - name: Test apiAntivirus
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
@@ -343,6 +344,7 @@ jobs:
             "OCIS_RUNTIME_PORT":"10250",
             "NATS_NATS_PORT":"10233",
             "MICRO_REGISTRY_ADDRESS":"127.0.0.1:10233",
+            "OCIS_EVENTS_ENDPOINT":"127.0.0.1:10233",
             "OCIS_EXCLUDE_RUN_SERVICES":"idp",
             "OCIS_ADD_RUN_SERVICES":"ocm,notifications",
             "OCIS_ENABLE_OCM":"true",
