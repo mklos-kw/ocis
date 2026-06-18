@@ -493,11 +493,7 @@ jobs:
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@10.28.1 --activate
       - name: Generate code
-        run: |
-          pnpm config set store-dir ./.pnpm-store
-          make ci-node-generate
-        env:
-          CHROMEDRIVER_SKIP_DOWNLOAD: "true"
+        run: make ci-node-generate
 
       - name: Setup Keycloak
         if: matrix.keycloak == true
