@@ -498,11 +498,6 @@ jobs:
           make ci-node-generate
         env:
           CHROMEDRIVER_SKIP_DOWNLOAD: "true"
-      - name: Cache Playwright Chromium
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ hashFiles('ci.env') }}
 
       - name: Setup Keycloak
         if: matrix.keycloak == true
@@ -519,9 +514,14 @@ jobs:
             git -C webTestRunner checkout "$WEB_COMMITID"
           fi
 
+      - name: Cache Playwright Chromium
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('webTestRunner/pnpm-lock.yaml') }}
+
       - name: Install web dependencies and Playwright
         run: |
-          pnpm config set store-dir ./.pnpm-store
           pnpm install
           pnpm exec playwright install --with-deps chromium
         working-directory: webTestRunner
@@ -543,9 +543,10 @@ jobs:
           demo-users: "true"
           tika: ${{ matrix.tika == true && 'true' || 'false' }}
           keycloak: ${{ matrix.keycloak == true && 'true' || 'false' }}
+          # GRAPH_AVAILABLE_ROLES: viewer,spaceViewer,editor,spaceEditor,fileEditor,
+          #   editorLite,manager,secureViewer,denied — full set required by e2e role tests.
           extra-server-env: >-
-            {"OCIS_TRANSLATION_PATH":"${{ github.workspace }}/tests/config/translations",
-            "WEB_UI_CONFIG_FILE":"${{ env.WEB_UI_CFG }}",
+            {"WEB_UI_CONFIG_FILE":"${{ env.WEB_UI_CFG }}",
             "THUMBNAILS_TXT_FONTMAP_FILE":"${{ github.workspace }}/tests/config/ci/fontsMap.json",
             "OCIS_PASSWORD_POLICY_BANNED_PASSWORDS_LIST":"${{ github.workspace }}/tests/config/ci/banned-password-list.txt",
             "GRAPH_AVAILABLE_ROLES":"b1e2218d-eef8-4d4c-b82d-0f1a1b48f3b5,a8d5fe5e-96e3-418d-825b-534dbdf22b99,fb6c3e19-e378-47e5-b277-9732f9de6e21,58c63c02-1d89-4572-916a-870abc5a1b7d,2d00ce52-1fc2-4dbc-8b95-a73b73395f5a,1c996275-f1c9-4e71-abdf-a42f6495e960,312c0871-5ef7-4b3a-85b6-0e4074c64049,aa97fe03-7980-45ac-9e50-b325749fd7e6,63e64e19-8d43-42ec-a738-2b6af2610efa",
@@ -558,9 +559,7 @@ jobs:
             sudo cp "$CERT" /usr/local/share/ca-certificates/ocis.crt
             sudo update-ca-certificates
           fi
-
-      - name: Set cert path env
-        run: echo "OCIS_CERT=${HOME}/.ocis/proxy/server.crt" >> "$GITHUB_ENV"
+          echo "OCIS_CERT=${HOME}/.ocis/proxy/server.crt" >> "$GITHUB_ENV"
 
       - name: Run e2e-${{ matrix.suite }}
         run: bash run-e2e.sh ${{ matrix.args }}
