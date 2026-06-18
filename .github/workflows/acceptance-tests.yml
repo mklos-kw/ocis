@@ -345,6 +345,8 @@ jobs:
             "NATS_NATS_PORT":"10233",
             "MICRO_REGISTRY_ADDRESS":"127.0.0.1:10233",
             "OCIS_EVENTS_ENDPOINT":"127.0.0.1:10233",
+            "OCIS_INSECURE":"true",
+            "OCIS_LDAP_URI":"ldaps://localhost:10235",
             "OCIS_EXCLUDE_RUN_SERVICES":"idp",
             "OCIS_ADD_RUN_SERVICES":"ocm,notifications",
             "OCIS_ENABLE_OCM":"true",
