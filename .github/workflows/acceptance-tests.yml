@@ -351,6 +351,7 @@ jobs:
             "STORAGE_SYSTEM_DATA_SERVER_URL":"http://localhost:10216/data",
             "STORAGE_USERS_DATA_SERVER_URL":"http://localhost:10158/data",
             "OCM_OCM_STORAGE_DATA_SERVER_URL":"http://localhost:10280/data",
+            "THUMBNAILS_DATA_ENDPOINT":"http://127.0.0.1:11190/thumbnails/data",
             "OCIS_EXCLUDE_RUN_SERVICES":"idp",
             "OCIS_ADD_RUN_SERVICES":"ocm,notifications",
             "OCIS_ENABLE_OCM":"true",
