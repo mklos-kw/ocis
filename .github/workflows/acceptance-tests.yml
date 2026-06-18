@@ -461,155 +461,120 @@ jobs:
 #          acceptance-test-type: core-api
 #          with-remote-php: "true"
 
-#  e2e-tests:
-#    name: e2e-${{ matrix.suite }}
-#    needs: [build-and-test]
-#    runs-on: ubuntu-latest
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        include:
-#          - suite: part-1
-#            args: "--total-parts 4 --xsuites search,app-provider,ocm,keycloak --run-part 1"
-#          - suite: part-2
-#            args: "--total-parts 4 --xsuites search,app-provider,ocm,keycloak --run-part 2"
-#          - suite: part-3
-#            args: "--total-parts 4 --xsuites search,app-provider,ocm,keycloak --run-part 3"
-#          - suite: part-4
-#            args: "--total-parts 4 --xsuites search,app-provider,ocm,keycloak --run-part 4"
-#          - suite: search
-#            args: "--suites search"
-#            tika: true
-#          - suite: keycloak
-#            args: "--suites journeys,keycloak"
-#            keycloak: true
-#    steps:
-#      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-#      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-#        with:
-#          # 24.16.0 breaks playwright install (yauzl zip extraction hangs); pin to last known good.
-#          # https://github.com/microsoft/playwright/issues/40724
-#          node-version: "24.15.0"
-#      - name: Enable pnpm
-#        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
-#      - name: Generate code
-#        run: |
-#          pnpm config set store-dir ./.pnpm-store
-#          make ci-node-generate
-#        env:
-#          CHROMEDRIVER_SKIP_DOWNLOAD: "true"
-#      - name: Cache Playwright Chromium
-#        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-#        with:
-#          path: ~/.cache/ms-playwright
-#          key: playwright-chromium-${{ hashFiles('ci.env') }}
-#
-#      - name: Setup Keycloak
-#        if: matrix.keycloak == true
-#        uses: mklos-kw/ocis-github-actions/ocis-keycloak-setup@main
-#
-#      - name: Clone web repo
-#        run: |
-#          WEB_BRANCH=$(grep '^WEB_BRANCH=' ci.env | cut -d= -f2- | tr -d '[:space:]')
-#          WEB_COMMITID=$(grep '^WEB_COMMITID=' ci.env | cut -d= -f2- | tr -d '[:space:]' || true)
-#          WEB_BRANCH="${WEB_BRANCH:-master}"
-#          git clone -b "$WEB_BRANCH" --single-branch --no-tags \
-#            https://github.com/owncloud/web.git webTestRunner
-#          if [[ -n "$WEB_COMMITID" ]]; then
-#            git -C webTestRunner checkout "$WEB_COMMITID"
-#          fi
-#
-#      - name: Install web dependencies and Playwright
-#        run: |
-#          pnpm config set store-dir ./.pnpm-store
-#          pnpm install
-#          pnpm exec playwright install --with-deps chromium
-#        working-directory: webTestRunner
-#
-#      - name: Patch web UI config
-#        run: |
-#          mkdir -p "${HOME}/.ocis/config"
-#          sed 's|https://ocis-server:9200|https://127.0.0.1:9200|g' \
-#            tests/config/ci/ocis-config.json \
-#            > "${HOME}/.ocis/config/web-ui-config.json"
-#          echo "WEB_UI_CFG=${HOME}/.ocis/config/web-ui-config.json" >> "$GITHUB_ENV"
-#
-#      - name: Setup oCIS
-#        uses: mklos-kw/ocis-github-actions/ocis-setup@main
-#        with:
-#          ocis-binary-artifact: ocis-binary
-#          ociswrapper-artifact: ociswrapper-binary
-#          ocis-url: "https://127.0.0.1:9200"
-#          demo-users: "true"
-#          tika: ${{ matrix.tika == true && 'true' || 'false' }}
-#          keycloak: ${{ matrix.keycloak == true && 'true' || 'false' }}
-#          extra-server-env: >-
-#            {"OCIS_TRANSLATION_PATH":"${{ github.workspace }}/tests/config/translations",
-#            "WEB_UI_CONFIG_FILE":"${{ env.WEB_UI_CFG }}",
-#            "THUMBNAILS_TXT_FONTMAP_FILE":"${{ github.workspace }}/tests/config/ci/fontsMap.json",
-#            "OCIS_PASSWORD_POLICY_BANNED_PASSWORDS_LIST":"${{ github.workspace }}/tests/config/ci/banned-password-list.txt",
-#            "GRAPH_AVAILABLE_ROLES":"b1e2218d-eef8-4d4c-b82d-0f1a1b48f3b5,a8d5fe5e-96e3-418d-825b-534dbdf22b99,fb6c3e19-e378-47e5-b277-9732f9de6e21,58c63c02-1d89-4572-916a-870abc5a1b7d,2d00ce52-1fc2-4dbc-8b95-a73b73395f5a,1c996275-f1c9-4e71-abdf-a42f6495e960,312c0871-5ef7-4b3a-85b6-0e4074c64049,aa97fe03-7980-45ac-9e50-b325749fd7e6,63e64e19-8d43-42ec-a738-2b6af2610efa",
-#            "FRONTEND_CONFIGURABLE_NOTIFICATIONS":"true",
-#            "ACTIVITYLOG_DEBUG_ADDR":"0.0.0.0:9197",
-#            "APP_PROVIDER_DEBUG_ADDR":"0.0.0.0:9165",
-#            "APP_REGISTRY_DEBUG_ADDR":"0.0.0.0:9243",
-#            "AUTH_BASIC_DEBUG_ADDR":"0.0.0.0:9147",
-#            "AUTH_MACHINE_DEBUG_ADDR":"0.0.0.0:9167",
-#            "AUTH_SERVICE_DEBUG_ADDR":"0.0.0.0:9198",
-#            "CLIENTLOG_DEBUG_ADDR":"0.0.0.0:9260",
-#            "EVENTHISTORY_DEBUG_ADDR":"0.0.0.0:9270",
-#            "FRONTEND_DEBUG_ADDR":"0.0.0.0:9141",
-#            "GATEWAY_DEBUG_ADDR":"0.0.0.0:9143",
-#            "GRAPH_DEBUG_ADDR":"0.0.0.0:9124",
-#            "GROUPS_DEBUG_ADDR":"0.0.0.0:9161",
-#            "IDM_DEBUG_ADDR":"0.0.0.0:9239",
-#            "IDP_DEBUG_ADDR":"0.0.0.0:9134",
-#            "INVITATIONS_DEBUG_ADDR":"0.0.0.0:9269",
-#            "NATS_DEBUG_ADDR":"0.0.0.0:9234",
-#            "OCDAV_DEBUG_ADDR":"0.0.0.0:9163",
-#            "OCM_DEBUG_ADDR":"0.0.0.0:9281",
-#            "OCS_DEBUG_ADDR":"0.0.0.0:9114",
-#            "POSTPROCESSING_DEBUG_ADDR":"0.0.0.0:9255",
-#            "PROXY_DEBUG_ADDR":"0.0.0.0:9205",
-#            "SEARCH_DEBUG_ADDR":"0.0.0.0:9224",
-#            "SETTINGS_DEBUG_ADDR":"0.0.0.0:9194",
-#            "SHARING_DEBUG_ADDR":"0.0.0.0:9151",
-#            "SSE_DEBUG_ADDR":"0.0.0.0:9139",
-#            "STORAGE_PUBLICLINK_DEBUG_ADDR":"0.0.0.0:9179",
-#            "STORAGE_SHARES_DEBUG_ADDR":"0.0.0.0:9156",
-#            "STORAGE_SYSTEM_DEBUG_ADDR":"0.0.0.0:9217",
-#            "STORAGE_USERS_DEBUG_ADDR":"0.0.0.0:9159",
-#            "THUMBNAILS_DEBUG_ADDR":"0.0.0.0:9189",
-#            "USERLOG_DEBUG_ADDR":"0.0.0.0:9214",
-#            "USERS_DEBUG_ADDR":"0.0.0.0:9145",
-#            "WEB_DEBUG_ADDR":"0.0.0.0:9104",
-#            "WEBDAV_DEBUG_ADDR":"0.0.0.0:9119",
-#            "WEBFINGER_DEBUG_ADDR":"0.0.0.0:9279"}
-#
-#      - name: Trust oCIS self-signed cert
-#        run: |
-#          CERT="${HOME}/.ocis/proxy/server.crt"
-#          if [[ -f "$CERT" ]]; then
-#            sudo cp "$CERT" /usr/local/share/ca-certificates/ocis.crt
-#            sudo update-ca-certificates
-#          fi
-#
-#      - name: Set cert path env
-#        run: echo "OCIS_CERT=${HOME}/.ocis/proxy/server.crt" >> "$GITHUB_ENV"
-#
-#      - name: Run e2e-${{ matrix.suite }}
-#        run: bash run-e2e.sh ${{ matrix.args }}
-#        working-directory: webTestRunner/tests/e2e
-#        env:
-#          BASE_URL_OCIS: https://127.0.0.1:9200
-#          HEADLESS: "true"
-#          RETRY: "3"
-#          SKIP_A11Y_TESTS: "true"
-#          REPORT_TRACING: "true"
-#          NODE_EXTRA_CA_CERTS: ${{ env.OCIS_CERT }}
-#          BROWSER: chromium
-#          KEYCLOAK: ${{ matrix.keycloak == true && 'true' || 'false' }}
-#          KEYCLOAK_HOST: localhost:8443
+  e2e-tests:
+    name: e2e-${{ matrix.suite }}
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: part-1
+            args: "--total-parts 4 --xsuites search,app-provider,ocm,keycloak --run-part 1"
+          - suite: part-2
+            args: "--total-parts 4 --xsuites search,app-provider,ocm,keycloak --run-part 2"
+          - suite: part-3
+            args: "--total-parts 4 --xsuites search,app-provider,ocm,keycloak --run-part 3"
+          - suite: part-4
+            args: "--total-parts 4 --xsuites search,app-provider,ocm,keycloak --run-part 4"
+          - suite: search
+            args: "--suites search"
+            tika: true
+          - suite: keycloak
+            args: "--suites journeys,keycloak"
+            keycloak: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          # 24.16.0 breaks playwright install (yauzl zip extraction hangs); pin to last known good.
+          # https://github.com/microsoft/playwright/issues/40724
+          node-version: "24.15.0"
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.28.1 --activate
+      - name: Generate code
+        run: |
+          pnpm config set store-dir ./.pnpm-store
+          make ci-node-generate
+        env:
+          CHROMEDRIVER_SKIP_DOWNLOAD: "true"
+      - name: Cache Playwright Chromium
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('ci.env') }}
+
+      - name: Setup Keycloak
+        if: matrix.keycloak == true
+        uses: mklos-kw/ocis-github-actions/ocis-keycloak-setup@main
+
+      - name: Clone web repo
+        run: |
+          WEB_BRANCH=$(grep '^WEB_BRANCH=' ci.env | cut -d= -f2- | tr -d '[:space:]')
+          WEB_COMMITID=$(grep '^WEB_COMMITID=' ci.env | cut -d= -f2- | tr -d '[:space:]' || true)
+          WEB_BRANCH="${WEB_BRANCH:-master}"
+          git clone -b "$WEB_BRANCH" --single-branch --no-tags \
+            https://github.com/owncloud/web.git webTestRunner
+          if [[ -n "$WEB_COMMITID" ]]; then
+            git -C webTestRunner checkout "$WEB_COMMITID"
+          fi
+
+      - name: Install web dependencies and Playwright
+        run: |
+          pnpm config set store-dir ./.pnpm-store
+          pnpm install
+          pnpm exec playwright install --with-deps chromium
+        working-directory: webTestRunner
+
+      - name: Patch web UI config
+        run: |
+          mkdir -p "${HOME}/.ocis/config"
+          sed 's|https://ocis-server:9200|https://127.0.0.1:9200|g' \
+            tests/config/ci/ocis-config.json \
+            > "${HOME}/.ocis/config/web-ui-config.json"
+          echo "WEB_UI_CFG=${HOME}/.ocis/config/web-ui-config.json" >> "$GITHUB_ENV"
+
+      - name: Setup oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
+          ocis-url: "https://127.0.0.1:9200"
+          demo-users: "true"
+          tika: ${{ matrix.tika == true && 'true' || 'false' }}
+          keycloak: ${{ matrix.keycloak == true && 'true' || 'false' }}
+          extra-server-env: >-
+            {"OCIS_TRANSLATION_PATH":"${{ github.workspace }}/tests/config/translations",
+            "WEB_UI_CONFIG_FILE":"${{ env.WEB_UI_CFG }}",
+            "THUMBNAILS_TXT_FONTMAP_FILE":"${{ github.workspace }}/tests/config/ci/fontsMap.json",
+            "OCIS_PASSWORD_POLICY_BANNED_PASSWORDS_LIST":"${{ github.workspace }}/tests/config/ci/banned-password-list.txt",
+            "GRAPH_AVAILABLE_ROLES":"b1e2218d-eef8-4d4c-b82d-0f1a1b48f3b5,a8d5fe5e-96e3-418d-825b-534dbdf22b99,fb6c3e19-e378-47e5-b277-9732f9de6e21,58c63c02-1d89-4572-916a-870abc5a1b7d,2d00ce52-1fc2-4dbc-8b95-a73b73395f5a,1c996275-f1c9-4e71-abdf-a42f6495e960,312c0871-5ef7-4b3a-85b6-0e4074c64049,aa97fe03-7980-45ac-9e50-b325749fd7e6,63e64e19-8d43-42ec-a738-2b6af2610efa",
+            "FRONTEND_CONFIGURABLE_NOTIFICATIONS":"true"}
+
+      - name: Trust oCIS self-signed cert
+        run: |
+          CERT="${HOME}/.ocis/proxy/server.crt"
+          if [[ -f "$CERT" ]]; then
+            sudo cp "$CERT" /usr/local/share/ca-certificates/ocis.crt
+            sudo update-ca-certificates
+          fi
+
+      - name: Set cert path env
+        run: echo "OCIS_CERT=${HOME}/.ocis/proxy/server.crt" >> "$GITHUB_ENV"
+
+      - name: Run e2e-${{ matrix.suite }}
+        run: bash run-e2e.sh ${{ matrix.args }}
+        working-directory: webTestRunner/tests/e2e
+        env:
+          BASE_URL_OCIS: https://127.0.0.1:9200
+          HEADLESS: "true"
+          RETRY: "3"
+          SKIP_A11Y_TESTS: "true"
+          REPORT_TRACING: "true"
+          NODE_EXTRA_CA_CERTS: ${{ env.OCIS_CERT }}
+          BROWSER: chromium
+          KEYCLOAK: ${{ matrix.keycloak == true && 'true' || 'false' }}
+          KEYCLOAK_HOST: localhost:8443
 
 
 #  litmus:
