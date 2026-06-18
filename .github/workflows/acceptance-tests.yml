@@ -494,8 +494,6 @@ jobs:
           # 24.16.0 breaks playwright install (yauzl zip extraction hangs); pin to last known good.
           # https://github.com/microsoft/playwright/issues/40724
           node-version: "24.15.0"
-          cache: 'pnpm'
-          cache-dependency-path: webTestRunner/pnpm-lock.yaml
 
       # --- fetch data ---
       - name: Clone web repo
