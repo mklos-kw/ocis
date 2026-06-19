@@ -585,30 +585,30 @@ jobs:
         with:
           suite: litmus
 
-#
-#  cs3api:
-#    name: cs3api
-#    needs: [build-and-test]
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-#      - name: Start oCIS
-#        uses: mklos-kw/ocis-github-actions/ocis-start-direct@main
-#        id: ocis
-#        with:
-#          ocis-binary-artifact: ocis-binary
-#          demo-users: "true"
-#          extra-server-env: >-
-#            {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
-#            "OCIS_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD":"false"}
-#      - name: Run cs3api validator
-#        run: |
-#          docker run --rm \
-#            --entrypoint /usr/bin/cs3api-validator \
-#            owncloud/cs3api-validator:0.2.1 \
-#            /var/lib/cs3api-validator \
-#            --endpoint="${OCIS_BRIDGE_IP}:9142"
-#
+  cs3api:
+    name: cs3api
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary-artifact: ocis-binary
+          demo-users: "true"
+          wrapper: "false"
+          docker-accessible: "true"
+          extra-server-env: >-
+            {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
+            "OCIS_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD":"false"}
+      - name: Run cs3api validator
+        run: |
+          docker run --rm \
+            --entrypoint /usr/bin/cs3api-validator \
+            owncloud/cs3api-validator:0.2.1 \
+            /var/lib/cs3api-validator \
+            --endpoint="${OCIS_BRIDGE_IP}:9142"
+
 #  wopi-builtin:
 #    name: wopi-builtin
 #    needs: [build-and-test]
@@ -747,7 +747,7 @@ jobs:
 
   all-acceptance-tests:
     # needs: [unit-tests, api-tests-plain, api-tests-email, api-tests-tika, api-tests-antivirus, api-tests-auth-app, api-tests-ocm, api-tests-wopi, cli-tests, core-api-tests, litmus, cs3api, wopi-builtin, wopi-cs3, e2e-tests]
-    needs: [unit-tests, api-tests-plain, api-tests-antivirus, api-tests-ocm, api-tests-wopi, cli-tests, litmus]
+    needs: [unit-tests, api-tests-plain, api-tests-antivirus, api-tests-ocm, api-tests-wopi, cli-tests, litmus, cs3api]
     runs-on: ubuntu-latest
     if: always()
     steps:
