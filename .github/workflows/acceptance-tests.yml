@@ -597,17 +597,17 @@ jobs:
           ocis-binary-artifact: ocis-binary
           demo-users: "true"
           wrapper: "false"
-          docker-accessible: "true"
           extra-server-env: >-
             {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
             "OCIS_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD":"false"}
       - name: Run cs3api validator
         run: |
           docker run --rm \
+            --network host \
             --entrypoint /usr/bin/cs3api-validator \
             owncloud/cs3api-validator:0.2.1 \
             /var/lib/cs3api-validator \
-            --endpoint="${OCIS_BRIDGE_IP}:9142"
+            --endpoint="localhost:9142"
 
 #  wopi-builtin:
 #    name: wopi-builtin
