@@ -483,6 +483,7 @@ jobs:
           - suite: keycloak
             args: "--suites journeys,keycloak"
             keycloak: true
+            demo_users: "false"
     steps:
       # --- tools ---
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -530,7 +531,7 @@ jobs:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
           ocis-url: "https://127.0.0.1:9200"
-          demo-users: "true"
+          demo-users: ${{ matrix.demo_users || 'true' }}
           tika: ${{ matrix.tika || 'false' }}
           keycloak: ${{ matrix.keycloak || 'false' }}
           web-ui-config: tests/config/ci/ocis-config.json
