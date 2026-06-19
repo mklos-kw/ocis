@@ -566,81 +566,25 @@ jobs:
           KEYCLOAK_HOST: localhost:8443
 
 
-#  litmus:
-#    name: litmus
-#    needs: [build-and-test]
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-#      - name: Start oCIS
-#        uses: mklos-kw/ocis-github-actions/ocis-start-direct@main
-#        id: ocis
-#        with:
-#          ocis-binary-artifact: ocis-binary
-#          demo-users: "true"
-#          extra-server-env: '{"OCIS_ASYNC_UPLOADS":"false"}'
-#      - name: Setup for litmus
-#        run: |
-#          OCIS_URL="https://127.0.0.1:9200"
-#          LITMUS_BASE="https://${{ steps.ocis.outputs.bridge-ip }}:9200"
-#
-#          # Get personal space ID
-#          SPACE_ID=$(curl -sk -uadmin:admin "${OCIS_URL}/graph/v1.0/me/drives" | python3 -c "import json,sys; drives=json.load(sys.stdin); [print([p for p in d.get('root',{}).get('webDavUrl','').split('/') if p][-1]) for d in drives.get('value',[]) if d.get('driveType')=='personal']")
-#          echo "SPACE_ID=${SPACE_ID}" >> "$GITHUB_ENV"
-#          echo "LITMUS_BASE=${LITMUS_BASE}" >> "$GITHUB_ENV"
-#          echo "Space ID: ${SPACE_ID}"
-#
-#          # Create test folder as einstein
-#          curl -sk -ueinstein:relativity -X MKCOL \
-#            "${OCIS_URL}/remote.php/webdav/new_folder" > /dev/null
-#
-#          # Share einstein → admin
-#          SHARE_RESP=$(curl -sk -ueinstein:relativity \
-#            "${OCIS_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares" \
-#            -d "path=/new_folder&shareType=0&permissions=15&name=new_folder&shareWith=admin")
-#          SHARE_ID=$(echo "$SHARE_RESP" | python3 -c "import re,sys; m=re.search(r'<id>(.+?)</id>', sys.stdin.read()); print(m.group(1) if m else '')")
-#          if [[ -n "$SHARE_ID" ]]; then
-#            curl -X POST -sk -uadmin:admin \
-#              "${OCIS_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares/pending/${SHARE_ID}" \
-#              > /dev/null
-#          fi
-#
-#          # Public share
-#          curl -sk -ueinstein:relativity \
-#            "${OCIS_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares" \
-#            -d "path=/new_folder&shareType=3&permissions=15&name=new_folder" > /dev/null
-#
-#      - name: Run litmus tests
-#        run: |
-#          LITMUS_IMAGE="owncloudci/litmus:latest"
-#          BRIDGE_IP="${OCIS_BRIDGE_IP}"
-#          BASE="https://${BRIDGE_IP}:9200"
-#          SPACE_ID="${SPACE_ID}"
-#          FAILED=()
-#
-#          run_litmus() {
-#            local name=$1 endpoint=$2
-#            echo "Testing [${name}]: ${endpoint}"
-#            docker run --rm \
-#              -e "LITMUS_URL=${endpoint}" \
-#              -e LITMUS_USERNAME=admin \
-#              -e LITMUS_PASSWORD=admin \
-#              -e "TESTS=basic copymove props http" \
-#              "$LITMUS_IMAGE" || FAILED+=("$name")
-#          }
-#
-#          run_litmus "old-endpoint"    "${BASE}/remote.php/webdav"
-#          run_litmus "new-endpoint"    "${BASE}/remote.php/dav/files/admin"
-#          run_litmus "new-shared"      "${BASE}/remote.php/dav/files/admin/Shares/new_folder/"
-#          run_litmus "old-shared"      "${BASE}/remote.php/webdav/Shares/new_folder/"
-#          run_litmus "spaces-endpoint" "${BASE}/remote.php/dav/spaces/${SPACE_ID}"
-#
-#          if [[ ${#FAILED[@]} -gt 0 ]]; then
-#            echo "Failed: ${FAILED[*]}"
-#            exit 1
-#          fi
-#          echo "All litmus tests passed."
-#
+  litmus:
+    name: litmus
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary-artifact: ocis-binary
+          demo-users: "true"
+          wrapper: "false"
+          docker-accessible: "true"
+          extra-server-env: '{"OCIS_ASYNC_UPLOADS":"false"}'
+      - name: Run litmus
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        with:
+          suite: litmus
+
 #
 #  cs3api:
 #    name: cs3api
@@ -803,7 +747,7 @@ jobs:
 
   all-acceptance-tests:
     # needs: [unit-tests, api-tests-plain, api-tests-email, api-tests-tika, api-tests-antivirus, api-tests-auth-app, api-tests-ocm, api-tests-wopi, cli-tests, core-api-tests, litmus, cs3api, wopi-builtin, wopi-cs3, e2e-tests]
-    needs: [unit-tests, api-tests-plain, api-tests-antivirus, api-tests-ocm, api-tests-wopi, cli-tests]
+    needs: [unit-tests, api-tests-plain, api-tests-antivirus, api-tests-ocm, api-tests-wopi, cli-tests, litmus]
     runs-on: ubuntu-latest
     if: always()
     steps:
