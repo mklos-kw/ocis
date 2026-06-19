@@ -615,74 +615,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Setup WOPI (builtin)
-        id: wopi
-        uses: mklos-kw/ocis-github-actions/ocis-wopi-setup@main
+      - name: Setup oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
           ocis-binary-artifact: ocis-binary
-          server-type: builtin
-      - name: Prepare test file and run WOPI validator
-        run: |
-          BRIDGE_IP="${OCIS_BRIDGE_IP}"
-          OCIS_URL="https://127.0.0.1:9200"
-          VALIDATOR_IMAGE="owncloudci/wopi-validator"
-
-          # PUT test file
-          curl -sk -uadmin:admin -X PUT \
-            --fail --retry-connrefused --retry 7 --retry-all-errors \
-            "${OCIS_URL}/remote.php/webdav/test.wopitest" \
-            -D /tmp/wopi-headers.txt
-
-          # Extract file ID
-          FILE_ID=$(grep -i 'Oc-Fileid:' /tmp/wopi-headers.txt | sed 's/.*: *//' | tr -d '\r\n ')
-          echo "FILE_ID=${FILE_ID}"
-
-          # Open app
-          OPEN=$(curl -sk -uadmin:admin -X POST --fail \
-            --retry-connrefused --retry 7 --retry-all-errors \
-            "${OCIS_URL}/app/open?app_name=FakeOffice&file_id=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('${FILE_ID}', safe=''))")")
-          echo "open: ${OPEN:0:400}"
-
-          ACCESS_TOKEN=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['form_parameters']['access_token'])")
-          TTL=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['form_parameters']['access_token_ttl'])")
-          APP_URL=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('app_url',''))")
-          if echo "$APP_URL" | grep -q 'files%2F'; then
-            FILE_ID_ENC=$(echo "$APP_URL" | sed 's/.*files%2F//')
-          elif echo "$APP_URL" | grep -q 'files/'; then
-            FILE_ID_ENC=$(echo "$APP_URL" | sed 's/.*files\///')
-          else
-            FILE_ID_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('${FILE_ID}', safe=''))")
-          fi
-          WOPI_SRC="http://${BRIDGE_IP}:9300/wopi/files/${FILE_ID_ENC}"
-          echo "WOPI_SRC=${WOPI_SRC}"
-
-          FAILED=()
-          SHARED_GROUPS=(BaseWopiViewing CheckFileInfoSchema EditFlows Locks AccessTokens GetLock ExtendedLockLength FileVersion Features)
-          BUILTIN_GROUPS=(PutRelativeFile RenameFileIfCreateChildFileIsNotSupported)
-
-          for group in "${SHARED_GROUPS[@]}"; do
-            echo "Running testgroup [${group}]"
-            docker run --rm --workdir /app \
-              --entrypoint /app/Microsoft.Office.WopiValidator \
-              "$VALIDATOR_IMAGE" \
-              -t "$ACCESS_TOKEN" -w "$WOPI_SRC" -l "$TTL" --testgroup "$group" \
-              || FAILED+=("$group")
-          done
-
-          for group in "${BUILTIN_GROUPS[@]}"; do
-            echo "Running testgroup [${group}] (secure)"
-            docker run --rm --workdir /app \
-              --entrypoint /app/Microsoft.Office.WopiValidator \
-              "$VALIDATOR_IMAGE" \
-              -s -t "$ACCESS_TOKEN" -w "$WOPI_SRC" -l "$TTL" --testgroup "$group" \
-              || FAILED+=("$group")
-          done
-
-          if [[ ${#FAILED[@]} -gt 0 ]]; then
-            echo "Failed testgroups: ${FAILED[*]}"
-            exit 1
-          fi
-          echo "All WOPI validator tests passed."
+          wrapper: "false"
+          skip-test-runner-setup: "true"
+          collaboration-apps: "fakeoffice"
+      - name: Run WOPI validator
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        with:
+          suite: wopi-builtin
 
 #  wopi-cs3:
 #    name: wopi-cs3
@@ -747,7 +690,7 @@ jobs:
 
   all-acceptance-tests:
     # needs: [unit-tests, api-tests-plain, api-tests-email, api-tests-tika, api-tests-antivirus, api-tests-auth-app, api-tests-ocm, api-tests-wopi, cli-tests, core-api-tests, litmus, cs3api, wopi-builtin, wopi-cs3, e2e-tests]
-    needs: [unit-tests, api-tests-plain, api-tests-antivirus, api-tests-ocm, api-tests-wopi, cli-tests, litmus, cs3api]
+    needs: [unit-tests, api-tests-plain, api-tests-antivirus, api-tests-ocm, api-tests-wopi, cli-tests, litmus, cs3api, wopi-builtin]
     runs-on: ubuntu-latest
     if: always()
     steps:
