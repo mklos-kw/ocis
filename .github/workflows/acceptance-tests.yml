@@ -184,67 +184,66 @@ jobs:
         with:
           suite: ${{ matrix.suite }}
 
+  api-tests-email:
+    name: ${{ matrix.suite }}
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          # settings & notifications (needs Mailpit)
+          - apiSettings
+          - apiNotification
+          - apiCors
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
+        with:
+          php-version: "8.4"
+          extensions: curl, xml, mbstring, zip, ldap, gd
+          tools: composer
+      - name: Setup oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
+          demo-users: "true"
+          email: "true"
+      - name: Test ${{ matrix.suite }}
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        with:
+          suite: ${{ matrix.suite }}
 
-#  api-tests-email:
-#    name: ${{ matrix.suite }}
-#    needs: [build-and-test]
-#    runs-on: ubuntu-latest
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        suite:
-#          # settings & notifications (needs Mailpit)
-#          - apiSettings
-#          - apiNotification
-#          - apiCors
-#    steps:
-#      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-#      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
-#        with:
-#          php-version: "8.4"
-#          extensions: curl, xml, mbstring, zip, ldap, gd
-#          tools: composer
-#      - name: Setup oCIS
-#        uses: mklos-kw/ocis-github-actions/ocis-setup@main
-#        with:
-#          ocis-binary-artifact: ocis-binary
-#          ociswrapper-artifact: ociswrapper-binary
-#          demo-users: "true"
-#          email: "true"
-#      - name: Test ${{ matrix.suite }}
-#        uses: mklos-kw/ocis-github-actions/ocis-test@main
-#        with:
-#          suite: ${{ matrix.suite }}
-
-#  api-tests-tika:
-#    name: ${{ matrix.suite }}
-#    needs: [build-and-test]
-#    runs-on: ubuntu-latest
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        suite:
-#          # full-text search (needs Tika)
-#          - apiSearch2
-#          - apiSearchContent
-#    steps:
-#      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-#      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
-#        with:
-#          php-version: "8.4"
-#          extensions: curl, xml, mbstring, zip, ldap, gd
-#          tools: composer
-#      - name: Setup oCIS
-#        uses: mklos-kw/ocis-github-actions/ocis-setup@main
-#        with:
-#          ocis-binary-artifact: ocis-binary
-#          ociswrapper-artifact: ociswrapper-binary
-#          demo-users: "true"
-#          tika: "true"
-#      - name: Test ${{ matrix.suite }}
-#        uses: mklos-kw/ocis-github-actions/ocis-test@main
-#        with:
-#          suite: ${{ matrix.suite }}
+  api-tests-tika:
+    name: ${{ matrix.suite }}
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          # full-text search (needs Tika)
+          - apiSearch2
+          - apiSearchContent
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
+        with:
+          php-version: "8.4"
+          extensions: curl, xml, mbstring, zip, ldap, gd
+          tools: composer
+      - name: Setup oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
+          demo-users: "true"
+          tika: "true"
+      - name: Test ${{ matrix.suite }}
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        with:
+          suite: ${{ matrix.suite }}
 
   api-tests-antivirus:
     name: apiAntivirus
@@ -270,28 +269,28 @@ jobs:
         with:
           suite: apiAntivirus
 
-#  api-tests-auth-app:
-#    name: apiAuthApp
-#    needs: [build-and-test]
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-#      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
-#        with:
-#          php-version: "8.4"
-#          extensions: curl, xml, mbstring, zip, ldap, gd
-#          tools: composer
-#      - name: Setup oCIS
-#        uses: mklos-kw/ocis-github-actions/ocis-setup@main
-#        with:
-#          ocis-binary-artifact: ocis-binary
-#          ociswrapper-artifact: ociswrapper-binary
-#          demo-users: "true"
-#          extra-server-env: '{"OCIS_ADD_RUN_SERVICES":"auth-app","PROXY_ENABLE_APP_AUTH":"true"}'
-#      - name: Test apiAuthApp
-#        uses: mklos-kw/ocis-github-actions/ocis-test@main
-#        with:
-#          suite: apiAuthApp
+  api-tests-auth-app:
+    name: apiAuthApp
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
+        with:
+          php-version: "8.4"
+          extensions: curl, xml, mbstring, zip, ldap, gd
+          tools: composer
+      - name: Setup oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
+          demo-users: "true"
+          extra-server-env: '{"OCIS_ADD_RUN_SERVICES":"auth-app","PROXY_ENABLE_APP_AUTH":"true"}'
+      - name: Test apiAuthApp
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        with:
+          suite: apiAuthApp
 
   api-tests-ocm:
     name: apiOcm
@@ -424,42 +423,42 @@ jobs:
         with:
           suite: ${{ matrix.suite }}
 
-#  core-api-tests:
-#    name: ${{ matrix.suite }}
-#    needs: [build-and-test]
-#    runs-on: ubuntu-latest
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        suite:
-#          - "coreApiAuth,coreApiCapabilities,coreApiFavorites,coreApiMain,coreApiVersions"
-#          - "coreApiShareManagementBasicToShares,coreApiShareManagementToShares"
-#          - "coreApiSharees"
-#          - "coreApiSharePublicLink2"
-#          - "coreApiShareOperationsToShares1,coreApiShareOperationsToShares2,coreApiSharePublicLink1,coreApiShareCreateSpecialToShares1,coreApiShareCreateSpecialToShares2,coreApiShareUpdateToShares"
-#          - "coreApiTrashbin,coreApiTrashbinRestore,coreApiWebdavEtagPropagation1,coreApiWebdavEtagPropagation2"
-#          - "coreApiWebdavDelete,coreApiWebdavOperations,coreApiWebdavMove2"
-#          - "coreApiWebdavProperties"
-#          - "coreApiWebdavMove1,coreApiWebdavPreviews,coreApiWebdavUpload,coreApiWebdavUploadTUS"
-#    steps:
-#      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-#      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
-#        with:
-#          php-version: "8.4"
-#          extensions: curl, xml, mbstring, zip, ldap, gd
-#          tools: composer
-#      - name: Setup oCIS
-#        uses: mklos-kw/ocis-github-actions/ocis-setup@main
-#        with:
-#          ocis-binary-artifact: ocis-binary
-#          ociswrapper-artifact: ociswrapper-binary
-#          demo-users: "true"
-#      - name: Test ${{ matrix.suite }}
-#        uses: mklos-kw/ocis-github-actions/ocis-test@main
-#        with:
-#          suite: ${{ matrix.suite }}
-#          acceptance-test-type: core-api
-#          with-remote-php: "true"
+  core-api-tests:
+    name: ${{ matrix.suite }}
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - "coreApiAuth,coreApiCapabilities,coreApiFavorites,coreApiMain,coreApiVersions"
+          - "coreApiShareManagementBasicToShares,coreApiShareManagementToShares"
+          - "coreApiSharees"
+          - "coreApiSharePublicLink2"
+          - "coreApiShareOperationsToShares1,coreApiShareOperationsToShares2,coreApiSharePublicLink1,coreApiShareCreateSpecialToShares1,coreApiShareCreateSpecialToShares2,coreApiShareUpdateToShares"
+          - "coreApiTrashbin,coreApiTrashbinRestore,coreApiWebdavEtagPropagation1,coreApiWebdavEtagPropagation2"
+          - "coreApiWebdavDelete,coreApiWebdavOperations,coreApiWebdavMove2"
+          - "coreApiWebdavProperties"
+          - "coreApiWebdavMove1,coreApiWebdavPreviews,coreApiWebdavUpload,coreApiWebdavUploadTUS"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
+        with:
+          php-version: "8.4"
+          extensions: curl, xml, mbstring, zip, ldap, gd
+          tools: composer
+      - name: Setup oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
+          demo-users: "true"
+      - name: Test ${{ matrix.suite }}
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        with:
+          suite: ${{ matrix.suite }}
+          acceptance-test-type: core-api
+          with-remote-php: "true"
 
   e2e-tests:
     name: e2e-${{ matrix.suite }}
@@ -565,7 +564,6 @@ jobs:
           KEYCLOAK: ${{ matrix.keycloak == true && 'true' || 'false' }}
           KEYCLOAK_HOST: localhost:8443
 
-
   litmus:
     name: litmus
     needs: [build-and-test]
@@ -578,6 +576,7 @@ jobs:
           ocis-binary-artifact: ocis-binary
           demo-users: "true"
           wrapper: "false"
+          skip-test-runner-setup: "true"
           docker-accessible: "true"
           extra-server-env: '{"OCIS_ASYNC_UPLOADS":"false"}'
       - name: Run litmus
@@ -597,17 +596,14 @@ jobs:
           ocis-binary-artifact: ocis-binary
           demo-users: "true"
           wrapper: "false"
+          skip-test-runner-setup: "true"
           extra-server-env: >-
             {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
             "OCIS_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD":"false"}
       - name: Run cs3api validator
-        run: |
-          docker run --rm \
-            --network host \
-            --entrypoint /usr/bin/cs3api-validator \
-            owncloud/cs3api-validator:0.2.1 \
-            /var/lib/cs3api-validator \
-            --endpoint="localhost:9142"
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        with:
+          suite: cs3api
 
   wopi-builtin:
     name: wopi-builtin
@@ -627,70 +623,28 @@ jobs:
         with:
           suite: wopi-builtin
 
-#  wopi-cs3:
-#    name: wopi-cs3
-#    needs: [build-and-test]
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-#      - name: Setup WOPI (cs3)
-#        id: wopi
-#        uses: mklos-kw/ocis-github-actions/ocis-wopi-setup@main
-#        with:
-#          ocis-binary-artifact: ocis-binary
-#          server-type: cs3
-#      - name: Prepare test file and run WOPI validator
-#        run: |
-#          BRIDGE_IP="${OCIS_BRIDGE_IP}"
-#          OCIS_URL="https://127.0.0.1:9200"
-#          VALIDATOR_IMAGE="owncloudci/wopi-validator"
-#
-#          curl -sk -uadmin:admin -X PUT \
-#            --fail --retry-connrefused --retry 7 --retry-all-errors \
-#            "${OCIS_URL}/remote.php/webdav/test.wopitest" \
-#            -D /tmp/wopi-headers.txt
-#
-#          FILE_ID=$(grep -i 'Oc-Fileid:' /tmp/wopi-headers.txt | sed 's/.*: *//' | tr -d '\r\n ')
-#          echo "FILE_ID=${FILE_ID}"
-#
-#          OPEN=$(curl -sk -uadmin:admin -X POST --fail \
-#            --retry-connrefused --retry 7 --retry-all-errors \
-#            "${OCIS_URL}/app/open?app_name=FakeOffice&file_id=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('${FILE_ID}', safe=''))")")
-#
-#          ACCESS_TOKEN=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['form_parameters']['access_token'])")
-#          TTL=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['form_parameters']['access_token_ttl'])")
-#          APP_URL=$(echo "$OPEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('app_url',''))")
-#          if echo "$APP_URL" | grep -q 'files%2F'; then
-#            FILE_ID_ENC=$(echo "$APP_URL" | sed 's/.*files%2F//')
-#          elif echo "$APP_URL" | grep -q 'files/'; then
-#            FILE_ID_ENC=$(echo "$APP_URL" | sed 's/.*files\///')
-#          else
-#            FILE_ID_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('${FILE_ID}', safe=''))")
-#          fi
-#          WOPI_SRC="http://${BRIDGE_IP}:9300/wopi/files/${FILE_ID_ENC}"
-#          echo "WOPI_SRC=${WOPI_SRC}"
-#
-#          FAILED=()
-#          SHARED_GROUPS=(BaseWopiViewing CheckFileInfoSchema EditFlows Locks AccessTokens GetLock ExtendedLockLength FileVersion Features)
-#
-#          for group in "${SHARED_GROUPS[@]}"; do
-#            echo "Running testgroup [${group}]"
-#            docker run --rm --workdir /app \
-#              --entrypoint /app/Microsoft.Office.WopiValidator \
-#              "$VALIDATOR_IMAGE" \
-#              -t "$ACCESS_TOKEN" -w "$WOPI_SRC" -l "$TTL" --testgroup "$group" \
-#              || FAILED+=("$group")
-#          done
-#
-#          if [[ ${#FAILED[@]} -gt 0 ]]; then
-#            echo "Failed testgroups: ${FAILED[*]}"
-#            exit 1
-#          fi
-#          echo "All WOPI validator tests passed."
+  wopi-cs3:
+    name: wopi-cs3
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary-artifact: ocis-binary
+          wrapper: "false"
+          skip-test-runner-setup: "true"
+          collaboration-apps: "cs3-wopi"
+      - name: Run WOPI validator
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        with:
+          suite: wopi-cs3
 
   all-acceptance-tests:
-    # needs: [unit-tests, api-tests-plain, api-tests-email, api-tests-tika, api-tests-antivirus, api-tests-auth-app, api-tests-ocm, api-tests-wopi, cli-tests, core-api-tests, litmus, cs3api, wopi-builtin, wopi-cs3, e2e-tests]
-    needs: [unit-tests, api-tests-plain, api-tests-antivirus, api-tests-ocm, api-tests-wopi, cli-tests, litmus, cs3api, wopi-builtin]
+    # Not yet gating (run but don't block merge): api-tests-email, api-tests-tika,
+    # api-tests-auth-app, core-api-tests, e2e-tests
+    needs: [unit-tests, api-tests-plain, api-tests-antivirus, api-tests-ocm, api-tests-wopi, cli-tests, litmus, cs3api, wopi-builtin, wopi-cs3]
     runs-on: ubuntu-latest
     if: always()
     steps:
