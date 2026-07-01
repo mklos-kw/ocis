@@ -1,5 +1,5 @@
 name: Acceptance Tests
-# retrigger: actions fixes (jq, WOPI_PORT, fakeoffice guard, libcurl cache, env safety)
+# retrigger: env safety (onlyoffice-image, ocis-binary), docker failure detection, WOPI timeout, cs3-wopi guard, port-offset collab, WOPI_TTL null
 
 on:
   pull_request:
