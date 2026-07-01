@@ -521,9 +521,6 @@ jobs:
         working-directory: webTestRunner
 
       # --- services ---
-      - name: Setup Keycloak
-        if: matrix.keycloak == true
-        uses: mklos-kw/ocis-github-actions/ocis-keycloak-setup@main
       - name: Setup oCIS
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
         with:
