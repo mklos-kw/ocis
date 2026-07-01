@@ -636,6 +636,15 @@ jobs:
           wrapper: "false"
           skip-test-runner-setup: "true"
           collaboration-apps: "cs3-wopi"
+          extra-server-env: |
+            {
+              "APP_PROVIDER_DRIVER": "wopi",
+              "APP_PROVIDER_WOPI_APP_NAME": "FakeOffice",
+              "APP_PROVIDER_WOPI_APP_URL": "http://localhost:8080",
+              "APP_PROVIDER_WOPI_INSECURE": "true",
+              "APP_PROVIDER_WOPI_WOPI_SERVER_EXTERNAL_URL": "http://localhost:9300",
+              "APP_PROVIDER_WOPI_FOLDER_URL_BASE_URL": "https://localhost:9200"
+            }
       - name: Run WOPI validator
         uses: mklos-kw/ocis-github-actions/ocis-test@main
         with:
