@@ -1,5 +1,5 @@
 name: Acceptance Tests
-# retrigger: env safety (onlyoffice-image, ocis-binary), docker failure detection, WOPI timeout, cs3-wopi guard, port-offset collab, WOPI_TTL null
+# retrigger: readability pass (revert @tsv, if/then/fi guards, expand :+, SOH comment)
 
 on:
   pull_request:
