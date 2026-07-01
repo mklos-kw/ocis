@@ -1,4 +1,5 @@
 name: Acceptance Tests
+# retrigger: actions fixes (jq, WOPI_PORT, fakeoffice guard, libcurl cache, env safety)
 
 on:
   pull_request:
