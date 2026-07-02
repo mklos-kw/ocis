@@ -1,5 +1,5 @@
 name: Acceptance Tests
-# retrigger: readability pass (revert @tsv, if/then/fi guards, expand :+, SOH comment)
+# retrigger: readability pass (2)
 
 on:
   pull_request:
