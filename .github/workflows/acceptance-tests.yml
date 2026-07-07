@@ -718,7 +718,6 @@ jobs:
           HEADLESS: "true"
           RETRY: "3"
           SKIP_A11Y_TESTS: "true"
-          REPORT_TRACING: "true"
           NODE_EXTRA_CA_CERTS: ${{ env.CA_BUNDLE }}
           BROWSER: chromium
           KEYCLOAK: ${{ (matrix.keycloak == true || matrix.mfa == true) && 'true' || 'false' }}
@@ -727,6 +726,7 @@ jobs:
           OIDC: ${{ matrix.oidc == true && 'true' || 'false' }}
           COLLABORATION: ${{ matrix.collaboration == true && 'true' || 'false' }}
           FEDERATED: ${{ matrix.federated == true && 'true' || 'false' }}
+          FEDERATED_BASE_URL_OCIS: 127.0.0.1:10200
 
       - name: Upload tracing result
         if: failure()
