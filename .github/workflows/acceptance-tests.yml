@@ -687,7 +687,7 @@ jobs:
       - name: Build extra-server-env
         shell: bash
         run: |
-          BASE='{"THUMBNAILS_TXT_FONTMAP_FILE":"${{ github.workspace }}/tests/config/ci/fontsMap.json","OCIS_PASSWORD_POLICY_BANNED_PASSWORDS_LIST":"${{ github.workspace }}/tests/config/ci/banned-password-list.txt","GRAPH_AVAILABLE_ROLES":"b1e2218d-eef8-4d4c-b82d-0f1a1b48f3b5,a8d5fe5e-96e3-418d-825b-534dbdf22b99,fb6c3e19-e378-47e5-b277-9732f9de6e21,58c63c02-1d89-4572-916a-870abc5a1b7d,2d00ce52-1fc2-4dbc-8b95-a73b73395f5a,1c996275-f1c9-4e71-abdf-a42f6495e960,312c0871-5ef7-4b3a-85b6-0e4074c64049,aa97fe03-7980-45ac-9e50-b325749fd7e6,63e64e19-8d43-42ec-a738-2b6af2610efa","FRONTEND_CONFIGURABLE_NOTIFICATIONS":"true"}'
+          BASE='{"THUMBNAILS_TXT_FONTMAP_FILE":"${{ github.workspace }}/tests/config/ci/fontsMap.json","OCIS_PASSWORD_POLICY_BANNED_PASSWORDS_LIST":"${{ github.workspace }}/tests/config/ci/banned-password-list.txt","OCIS_PASSWORD_POLICY_MIN_CHARACTERS":"3","OCIS_PASSWORD_POLICY_MIN_LOWERCASE_CHARACTERS":"0","OCIS_PASSWORD_POLICY_MIN_UPPERCASE_CHARACTERS":"0","OCIS_PASSWORD_POLICY_MIN_DIGITS":"0","OCIS_PASSWORD_POLICY_MIN_SPECIAL_CHARACTERS":"0","GRAPH_AVAILABLE_ROLES":"b1e2218d-eef8-4d4c-b82d-0f1a1b48f3b5,a8d5fe5e-96e3-418d-825b-534dbdf22b99,fb6c3e19-e378-47e5-b277-9732f9de6e21,58c63c02-1d89-4572-916a-870abc5a1b7d,2d00ce52-1fc2-4dbc-8b95-a73b73395f5a,1c996275-f1c9-4e71-abdf-a42f6495e960,312c0871-5ef7-4b3a-85b6-0e4074c64049,aa97fe03-7980-45ac-9e50-b325749fd7e6,63e64e19-8d43-42ec-a738-2b6af2610efa","FRONTEND_CONFIGURABLE_NOTIFICATIONS":"true"}'
           SUITE_EXTRA='{}'
           if [[ "${{ matrix.oidc }}" == "true" ]]; then
             SUITE_EXTRA='{"IDP_ACCESS_TOKEN_EXPIRATION":"30","WEB_OIDC_SCOPE":"openid profile email offline_access"}'
@@ -727,8 +727,9 @@ jobs:
           ocis-url: ${{ matrix.federated == true && 'https://localhost:9200' || 'https://127.0.0.1:9200' }}
           demo-users: ${{ matrix.demo_users || 'true' }}
           tika: ${{ matrix.tika || 'false' }}
-          keycloak: ${{ matrix.keycloak || 'false' }}
+          keycloak: ${{ (matrix.keycloak == true || matrix.mfa == true) && 'true' || 'false' }}
           web-ui-config: tests/config/ci/ocis-config-suite.json
+          collaboration-apps: ${{ matrix.collaboration == true && 'collabora,onlyoffice' || '' }}
           # GRAPH_AVAILABLE_ROLES: viewer,spaceViewer,editor,spaceEditor,fileEditor,
           #   editorLite,manager,secureViewer,denied — full set required by e2e role tests.
           extra-server-env: ${{ env.OCIS_EXTRA_SERVER_ENV }}
@@ -759,7 +760,6 @@ jobs:
             "STORAGE_USERS_DATA_SERVER_URL":"http://localhost:10158/data",
             "OCM_OCM_STORAGE_DATA_SERVER_URL":"http://localhost:10280/data",
             "THUMBNAILS_DATA_ENDPOINT":"http://127.0.0.1:11190/thumbnails/data",
-            "OCIS_EXCLUDE_RUN_SERVICES":"idp",
             "OCIS_ADD_RUN_SERVICES":"ocm",
             "OCIS_ENABLE_OCM":"true",
             "OCM_OCM_INVITE_MANAGER_INSECURE":"true",
@@ -771,11 +771,15 @@ jobs:
       - name: Combine CA certs for Node.js
         shell: bash
         run: |
-          cat "$OCIS_CERT" ${KEYCLOAK_CERT:+"$KEYCLOAK_CERT"} > /tmp/combined-ca.pem
+          cat "$OCIS_CERT" \
+            ${KEYCLOAK_CERT:+"$KEYCLOAK_CERT"} \
+            ${FEDERATED_CERT:+"$FEDERATED_CERT"} \
+            > /tmp/combined-ca.pem
           echo "CA_BUNDLE=/tmp/combined-ca.pem" >> "$GITHUB_ENV"
         env:
           OCIS_CERT: ${{ env.OCIS_CERT }}
           KEYCLOAK_CERT: ${{ env.KEYCLOAK_CERT }}
+          FEDERATED_CERT: ${{ matrix.federated == true && '/home/runner/.ocis-federation/proxy/server.crt' || '' }}
       - name: Run e2e-${{ matrix.suite }}
         run: bash run-e2e.sh ${{ matrix.args }}
         working-directory: web/tests/e2e
