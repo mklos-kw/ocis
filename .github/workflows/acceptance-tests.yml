@@ -592,9 +592,9 @@ jobs:
           pnpm exec playwright install --with-deps chromium
         working-directory: web
 
-      # --- Keycloak (keycloak and mfa suites) ---
+      # --- Keycloak (mfa suite only — keycloak suite uses ocis-setup CHA's built-in keycloak support) ---
       - name: Generate Keycloak certs
-        if: matrix.keycloak == true || matrix.mfa == true
+        if: matrix.mfa == true
         run: |
           mkdir -p keycloak-certs
           openssl req -x509 -newkey rsa:2048 \
@@ -605,7 +605,7 @@ jobs:
           chmod -R 777 keycloak-certs
 
       - name: Start Postgres
-        if: matrix.keycloak == true || matrix.mfa == true
+        if: matrix.mfa == true
         run: |
           docker run -d --name postgres --network host \
             -e POSTGRES_DB=keycloak \
@@ -615,14 +615,10 @@ jobs:
           timeout 30 bash -c 'until docker exec postgres pg_isready -U keycloak; do sleep 1; done'
 
       - name: Start Keycloak
-        if: matrix.keycloak == true || matrix.mfa == true
+        if: matrix.mfa == true
         run: |
-          # mfa suite uses ocis-mfa-ci-realm (TOTP MFA); keycloak suite uses ocis-ci-realm
-          if [[ "${{ matrix.mfa }}" == "true" ]]; then
-            REALM_FILE=tests/config/ci/ocis-mfa-ci-realm.dist.json
-          else
-            REALM_FILE=tests/config/ci/ocis-ci-realm.dist.json
-          fi
+          # mfa suite uses a different realm (TOTP MFA) than the keycloak suite
+          REALM_FILE=tests/config/ci/ocis-mfa-ci-realm.dist.json
           sed -e 's|https://ocis-server:9200|https://127.0.0.1:9200|g' \
               -e 's|https://localhost:9200|https://127.0.0.1:9200|g' \
             "$REALM_FILE" > /tmp/ocis-realm.json
