@@ -592,9 +592,9 @@ jobs:
           pnpm exec playwright install --with-deps chromium
         working-directory: web
 
-      # --- Keycloak (mfa suite only — keycloak suite is handled by the ocis-setup CHA) ---
+      # --- Keycloak (keycloak and mfa suites) ---
       - name: Generate Keycloak certs
-        if: matrix.mfa == true
+        if: matrix.keycloak == true || matrix.mfa == true
         run: |
           mkdir -p keycloak-certs
           openssl req -x509 -newkey rsa:2048 \
@@ -605,7 +605,7 @@ jobs:
           chmod -R 777 keycloak-certs
 
       - name: Start Postgres
-        if: matrix.mfa == true
+        if: matrix.keycloak == true || matrix.mfa == true
         run: |
           docker run -d --name postgres --network host \
             -e POSTGRES_DB=keycloak \
@@ -615,10 +615,14 @@ jobs:
           timeout 30 bash -c 'until docker exec postgres pg_isready -U keycloak; do sleep 1; done'
 
       - name: Start Keycloak
-        if: matrix.mfa == true
+        if: matrix.keycloak == true || matrix.mfa == true
         run: |
-          # mfa suite needs ocis-mfa-ci-realm with TOTP MFA configured.
-          REALM_FILE=tests/config/ci/ocis-mfa-ci-realm.dist.json
+          # mfa suite uses ocis-mfa-ci-realm (TOTP MFA); keycloak suite uses ocis-ci-realm
+          if [[ "${{ matrix.mfa }}" == "true" ]]; then
+            REALM_FILE=tests/config/ci/ocis-mfa-ci-realm.dist.json
+          else
+            REALM_FILE=tests/config/ci/ocis-ci-realm.dist.json
+          fi
           sed -e 's|https://ocis-server:9200|https://127.0.0.1:9200|g' \
               -e 's|https://localhost:9200|https://127.0.0.1:9200|g' \
             "$REALM_FILE" > /tmp/ocis-realm.json
@@ -688,23 +692,52 @@ jobs:
         shell: bash
         run: |
           BASE='{"THUMBNAILS_TXT_FONTMAP_FILE":"${{ github.workspace }}/tests/config/ci/fontsMap.json","OCIS_PASSWORD_POLICY_BANNED_PASSWORDS_LIST":"${{ github.workspace }}/tests/config/ci/banned-password-list.txt","GRAPH_AVAILABLE_ROLES":"b1e2218d-eef8-4d4c-b82d-0f1a1b48f3b5,a8d5fe5e-96e3-418d-825b-534dbdf22b99,fb6c3e19-e378-47e5-b277-9732f9de6e21,58c63c02-1d89-4572-916a-870abc5a1b7d,2d00ce52-1fc2-4dbc-8b95-a73b73395f5a,1c996275-f1c9-4e71-abdf-a42f6495e960,312c0871-5ef7-4b3a-85b6-0e4074c64049,aa97fe03-7980-45ac-9e50-b325749fd7e6,63e64e19-8d43-42ec-a738-2b6af2610efa","FRONTEND_CONFIGURABLE_NOTIFICATIONS":"true"}'
-          if [[ "${{ matrix.federated }}" == "true" ]]; then
-            OCM='{"OCIS_ADD_RUN_SERVICES":"ocm","OCIS_ENABLE_OCM":"true","OCM_OCM_INVITE_MANAGER_INSECURE":"true","OCM_OCM_SHARE_PROVIDER_INSECURE":"true","OCM_OCM_STORAGE_PROVIDER_INSECURE":"true","OCM_OCM_PROVIDER_AUTHORIZER_PROVIDERS_FILE":"/tmp/ocm-providers.json"}'
-            MERGED=$(jq -sc '.[0] * .[1]' <(echo "$BASE") <(echo "$OCM"))
-          else
-            MERGED="$BASE"
+          SUITE_EXTRA='{}'
+          if [[ "${{ matrix.oidc }}" == "true" ]]; then
+            SUITE_EXTRA='{"IDP_ACCESS_TOKEN_EXPIRATION":"30","WEB_OIDC_SCOPE":"openid profile email offline_access"}'
+          elif [[ "${{ matrix.oidc_iframe }}" == "true" ]]; then
+            SUITE_EXTRA='{"IDP_ACCESS_TOKEN_EXPIRATION":"30"}'
+          elif [[ "${{ matrix.collaboration }}" == "true" ]]; then
+            SUITE_EXTRA='{"PROXY_CSP_CONFIG_FILE_LOCATION":"${{ github.workspace }}/tests/config/ci/csp.yaml"}'
+          elif [[ "${{ matrix.federated }}" == "true" ]]; then
+            SUITE_EXTRA='{"OCIS_ADD_RUN_SERVICES":"ocm","OCIS_ENABLE_OCM":"true","OCM_OCM_INVITE_MANAGER_INSECURE":"true","OCM_OCM_SHARE_PROVIDER_INSECURE":"true","OCM_OCM_STORAGE_PROVIDER_INSECURE":"true","OCM_OCM_PROVIDER_AUTHORIZER_PROVIDERS_FILE":"${{ github.workspace }}/tests/config/local/providers.json"}'
           fi
+          MERGED=$(jq -sc '.[0] * .[1]' <(echo "$BASE") <(echo "$SUITE_EXTRA"))
           echo "OCIS_EXTRA_SERVER_ENV=$MERGED" >> "$GITHUB_ENV"
 
-      # --- OCM federation setup (ocm suite only) ---
-      - name: Patch OCM providers.json
-        if: matrix.federated == true
+      # --- patch web-ui-config for suites that need custom OIDC scope or extra apps ---
+      - name: Prepare web-ui-config
+        shell: bash
         run: |
-          sed \
-            -e 's|ocis-server:9200|localhost:9200|g' \
-            -e 's|federation-ocis-server:10200|localhost:10200|g' \
-            tests/config/ci/providers.json > /tmp/ocm-providers.json
+          SRC=tests/config/ci/ocis-config.json
+          DEST=tests/config/ci/ocis-config-suite.json
+          cp "$SRC" "$DEST"
+          if [[ "${{ matrix.oidc }}" == "true" ]]; then
+            jq '.openIdConnect.scope = "openid profile email offline_access"' "$DEST" > "$DEST.tmp" && mv "$DEST.tmp" "$DEST"
+          elif [[ "${{ matrix.mfa }}" == "true" ]]; then
+            jq '.openIdConnect.scope = "openid profile email acr"' "$DEST" > "$DEST.tmp" && mv "$DEST.tmp" "$DEST"
+          elif [[ "${{ matrix.federated }}" == "true" ]]; then
+            jq '.apps += ["ocm"]' "$DEST" > "$DEST.tmp" && mv "$DEST.tmp" "$DEST"
+          elif [[ "${{ matrix.collaboration }}" == "true" ]]; then
+            jq '.apps += ["external"]' "$DEST" > "$DEST.tmp" && mv "$DEST.tmp" "$DEST"
+          fi
 
+      # --- services ---
+      - name: Setup oCIS
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
+          ocis-url: ${{ matrix.federated == true && 'https://localhost:9200' || 'https://127.0.0.1:9200' }}
+          demo-users: ${{ matrix.demo_users || 'true' }}
+          tika: ${{ matrix.tika || 'false' }}
+          keycloak: ${{ matrix.keycloak || 'false' }}
+          web-ui-config: tests/config/ci/ocis-config-suite.json
+          # GRAPH_AVAILABLE_ROLES: viewer,spaceViewer,editor,spaceEditor,fileEditor,
+          #   editorLite,manager,secureViewer,denied — full set required by e2e role tests.
+          extra-server-env: ${{ env.OCIS_EXTRA_SERVER_ENV }}
+
+      # --- OCM federation instance (ocm suite only, starts AFTER primary so binary is available) ---
       - name: Setup federation oCIS
         if: matrix.federated == true
         uses: mklos-kw/ocis-github-actions/ocis-setup@main
@@ -736,22 +769,8 @@ jobs:
             "OCM_OCM_INVITE_MANAGER_INSECURE":"true",
             "OCM_OCM_SHARE_PROVIDER_INSECURE":"true",
             "OCM_OCM_STORAGE_PROVIDER_INSECURE":"true",
-            "OCM_OCM_PROVIDER_AUTHORIZER_PROVIDERS_FILE":"/tmp/ocm-providers.json"}
+            "OCM_OCM_PROVIDER_AUTHORIZER_PROVIDERS_FILE":"${{ github.workspace }}/tests/config/local/providers.json"}
 
-      # --- services ---
-      - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
-        with:
-          ocis-binary-artifact: ocis-binary
-          ociswrapper-artifact: ociswrapper-binary
-          ocis-url: "https://127.0.0.1:9200"
-          demo-users: ${{ matrix.demo_users || 'true' }}
-          tika: ${{ matrix.tika || 'false' }}
-          keycloak: ${{ matrix.keycloak || 'false' }}
-          web-ui-config: tests/config/ci/ocis-config.json
-          # GRAPH_AVAILABLE_ROLES: viewer,spaceViewer,editor,spaceEditor,fileEditor,
-          #   editorLite,manager,secureViewer,denied — full set required by e2e role tests.
-          extra-server-env: ${{ env.OCIS_EXTRA_SERVER_ENV }}
       # --- run ---
       - name: Combine CA certs for Node.js
         shell: bash
@@ -765,7 +784,7 @@ jobs:
         run: bash run-e2e.sh ${{ matrix.args }}
         working-directory: web/tests/e2e
         env:
-          BASE_URL_OCIS: https://127.0.0.1:9200
+          BASE_URL_OCIS: ${{ matrix.federated == true && 'https://localhost:9200' || 'https://127.0.0.1:9200' }}
           HEADLESS: "true"
           RETRY: "3"
           SKIP_A11Y_TESTS: "true"
@@ -777,7 +796,7 @@ jobs:
           OIDC: ${{ matrix.oidc == true && 'true' || 'false' }}
           COLLABORATION: ${{ matrix.collaboration == true && 'true' || 'false' }}
           FEDERATED: ${{ matrix.federated == true && 'true' || 'false' }}
-          FEDERATED_BASE_URL_OCIS: 127.0.0.1:10200
+          FEDERATED_BASE_URL_OCIS: localhost:10200
 
       - name: Upload tracing result
         if: failure()
