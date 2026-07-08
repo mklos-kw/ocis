@@ -593,44 +593,6 @@ jobs:
           pnpm exec playwright install --with-deps chromium
         working-directory: web
 
-      # --- Collabora + OnlyOffice (app-provider suite only) ---
-      - name: Start Collabora
-        if: matrix.collaboration == true
-        run: |
-          docker run -d \
-            --name collabora \
-            --network host \
-            --entrypoint bash \
-            -e DONT_GEN_SSL_CERT=set \
-            -e "extra_params=--o:ssl.enable=true --o:ssl.termination=true --o:welcome.enable=false --o:net.frame_ancestors=https://127.0.0.1:9200" \
-            collabora/code:25.04.7.3.1 \
-            -c "coolconfig generate-proof-key && bash /start-collabora-online.sh"
-          timeout 150 bash -c 'until curl -kfsSL https://localhost:9980/hosting/discovery > /dev/null; do sleep 5; done'
-          echo "collabora ready."
-
-      - name: Start OnlyOffice
-        if: matrix.collaboration == true
-        run: |
-          sudo systemctl stop postgresql || true
-          docker run -d \
-            --name onlyoffice \
-            --network host \
-            -e WOPI_ENABLED=true \
-            -e USE_UNAUTHORIZED_STORAGE=true \
-            -v "${{ github.workspace }}/tests/config/ci/only-office.json:/tmp/local.json:ro" \
-            --entrypoint /bin/sh \
-            onlyoffice/documentserver:9.2.1 \
-            -c "set -e
-          cp /tmp/local.json /etc/onlyoffice/documentserver/local.json
-          openssl req -x509 -newkey rsa:4096 -keyout onlyoffice.key -out onlyoffice.crt -sha256 -days 365 -batch -nodes
-          mkdir -p /var/www/onlyoffice/Data/certs
-          cp onlyoffice.key /var/www/onlyoffice/Data/certs/
-          cp onlyoffice.crt /var/www/onlyoffice/Data/certs/
-          chmod 400 /var/www/onlyoffice/Data/certs/onlyoffice.key
-          /app/ds/run-document-server.sh"
-          timeout 150 bash -c 'until curl -kfsSL https://localhost:443/hosting/discovery > /dev/null; do sleep 5; done'
-          echo "onlyoffice ready."
-
       # --- build extra-server-env (merge base + suite-specific vars) ---
       - name: Build extra-server-env
         shell: bash
