@@ -603,6 +603,8 @@ jobs:
             SUITE_EXTRA='{"IDP_ACCESS_TOKEN_EXPIRATION":"30","WEB_OIDC_SCOPE":"openid profile email offline_access"}'
           elif [[ "${{ matrix.oidc_iframe }}" == "true" ]]; then
             SUITE_EXTRA='{"IDP_ACCESS_TOKEN_EXPIRATION":"30"}'
+          elif [[ "${{ matrix.mfa }}" == "true" ]]; then
+            SUITE_EXTRA='{"OCIS_MFA_ENABLED":"true"}'
           elif [[ "${{ matrix.collaboration }}" == "true" ]]; then
             SUITE_EXTRA='{"PROXY_CSP_CONFIG_FILE_LOCATION":"${{ github.workspace }}/tests/config/ci/csp.yaml"}'
           elif [[ "${{ matrix.federated }}" == "true" ]]; then
@@ -641,9 +643,17 @@ jobs:
           keycloak-realm-file: ${{ matrix.keycloak_realm_file || 'tests/config/ci/ocis-ci-realm.dist.json' }}
           web-ui-config: tests/config/ci/ocis-config-suite.json
           collaboration-apps: ${{ matrix.collaboration == true && 'collabora,onlyoffice' || '' }}
+          collabora-image: collabora/code:25.04.7.3.1
+          onlyoffice-image: onlyoffice/documentserver:9.2.1
           # GRAPH_AVAILABLE_ROLES: viewer,spaceViewer,editor,spaceEditor,fileEditor,
           #   editorLite,manager,secureViewer,denied — full set required by e2e role tests.
           extra-server-env: ${{ env.OCIS_EXTRA_SERVER_ENV }}
+
+      # Save primary oCIS cert before federation setup overwrites OCIS_CERT
+      - name: Save primary oCIS cert
+        if: matrix.federated == true
+        shell: bash
+        run: echo "PRIMARY_OCIS_CERT=${{ env.OCIS_CERT }}" >> "$GITHUB_ENV"
 
       # --- OCM federation instance (ocm suite only, starts AFTER primary so binary is available) ---
       - name: Setup federation oCIS
@@ -688,7 +698,7 @@ jobs:
             > /tmp/combined-ca.pem
           echo "CA_BUNDLE=/tmp/combined-ca.pem" >> "$GITHUB_ENV"
         env:
-          OCIS_CERT: ${{ env.OCIS_CERT }}
+          OCIS_CERT: ${{ env.PRIMARY_OCIS_CERT || env.OCIS_CERT }}
           KEYCLOAK_CERT: ${{ env.KEYCLOAK_CERT }}
           FEDERATED_CERT: ${{ matrix.federated == true && '/home/runner/.ocis-federation/proxy/server.crt' || '' }}
       - name: Run e2e-${{ matrix.suite }}
