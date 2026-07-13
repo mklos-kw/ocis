@@ -657,9 +657,9 @@ jobs:
         shell: bash
         run: |
           cp tests/config/local/app-registry-office-suites.yaml "$HOME/.ocis/config/app-registry.yaml"
-          curl -s -X POST http://localhost:5200/config \
+          curl -sf -X PUT http://localhost:5200/config \
             -H "Content-Type: application/json" \
-            -d '{}' || true
+            -d '{}'
           # Wait for oCIS to be healthy again after restart
           timeout 120 bash -c \
             'until curl -sk -uadmin:admin https://127.0.0.1:9200/graph/v1.0/users/admin \
@@ -686,6 +686,7 @@ jobs:
           pid-file: /tmp/ocis-federation.pid
           log-file: /tmp/ocis-federation.log
           debug-port-offset: "1000"
+          web-ui-config: tests/config/ci/ocis-config-suite.json
           extra-server-env: >-
             {"OCIS_BASE_DATA_PATH":"/home/runner/.ocis-federation",
             "OCIS_RUNTIME_PORT":"10250",
