@@ -645,73 +645,10 @@ jobs:
           collaboration-apps: ${{ matrix.collaboration == true && 'collabora,onlyoffice' || '' }}
           collabora-image: collabora/code:25.04.7.3.1
           onlyoffice-image: onlyoffice/documentserver:9.2.1
+          app-registry-file: ${{ matrix.collaboration == true && 'tests/config/local/app-registry-office-suites.yaml' || '' }}
           # GRAPH_AVAILABLE_ROLES: viewer,spaceViewer,editor,spaceEditor,fileEditor,
           #   editorLite,manager,secureViewer,denied — full set required by e2e role tests.
           extra-server-env: ${{ env.OCIS_EXTRA_SERVER_ENV }}
-
-      # Use office-suites app-registry (Collabora+OnlyOffice) for collaboration suite.
-      # CHA copies its own FakeOffice-only registry at init; overwrite it and restart
-      # oCIS via ociswrapper so app-registry picks up allow_creation for docx/odt.
-      - name: Override app-registry for collaboration suite
-        if: matrix.collaboration == true
-        shell: bash
-        run: |
-          cp tests/config/local/app-registry-office-suites.yaml "$HOME/.ocis/config/app-registry.yaml"
-          curl -sf -X PUT http://localhost:5200/config \
-            -H "Content-Type: application/json" \
-            -d '{}'
-          # Wait for oCIS to be healthy again after restart
-          timeout 120 bash -c \
-            'until curl -sk -uadmin:admin https://127.0.0.1:9200/graph/v1.0/users/admin \
-               -w "%{http_code}" -o /dev/null 2>/dev/null | grep -q "200"; do sleep 2; done'
-          echo "oCIS restarted with office-suites app-registry."
-          # oCIS restart kills nats-js-kv, disconnecting collaboration services.
-          # Kill and re-launch them so they re-register with the new nats instance.
-          for name in collabora onlyoffice; do
-            [[ -f /tmp/collab-${name}.pid ]] && kill "$(cat /tmp/collab-${name}.pid)" 2>/dev/null || true
-          done
-          env OCIS_URL=https://127.0.0.1:9200 \
-              OCIS_CONFIG_DIR="$HOME/.ocis/config" \
-              MICRO_REGISTRY=nats-js-kv \
-              MICRO_REGISTRY_ADDRESS=localhost:9233 \
-              COLLABORATION_LOG_LEVEL=debug \
-              COLLABORATION_GRPC_ADDR=0.0.0.0:9301 \
-              COLLABORATION_HTTP_ADDR=0.0.0.0:9300 \
-              COLLABORATION_DEBUG_ADDR=0.0.0.0:9304 \
-              COLLABORATION_APP_PROOF_DISABLE=true \
-              COLLABORATION_APP_INSECURE=true \
-              COLLABORATION_CS3API_DATAGATEWAY_INSECURE=true \
-              OCIS_JWT_SECRET=some-ocis-jwt-secret \
-              COLLABORATION_WOPI_SECRET=some-wopi-secret \
-              COLLABORATION_APP_NAME=Collabora \
-              COLLABORATION_APP_PRODUCT=Collabora \
-              COLLABORATION_APP_ADDR=https://localhost:9980 \
-              COLLABORATION_WOPI_SRC=http://localhost:9300 \
-              ocis/bin/ocis collaboration server > /tmp/collab-collabora.log 2>&1 &
-          echo $! > /tmp/collab-collabora.pid
-          env OCIS_URL=https://127.0.0.1:9200 \
-              OCIS_CONFIG_DIR="$HOME/.ocis/config" \
-              MICRO_REGISTRY=nats-js-kv \
-              MICRO_REGISTRY_ADDRESS=localhost:9233 \
-              COLLABORATION_LOG_LEVEL=debug \
-              COLLABORATION_GRPC_ADDR=0.0.0.0:9311 \
-              COLLABORATION_HTTP_ADDR=0.0.0.0:9310 \
-              COLLABORATION_DEBUG_ADDR=0.0.0.0:9314 \
-              COLLABORATION_APP_PROOF_DISABLE=true \
-              COLLABORATION_APP_INSECURE=true \
-              COLLABORATION_CS3API_DATAGATEWAY_INSECURE=true \
-              OCIS_JWT_SECRET=some-ocis-jwt-secret \
-              COLLABORATION_WOPI_SECRET=some-wopi-secret \
-              COLLABORATION_APP_NAME=OnlyOffice \
-              COLLABORATION_APP_PRODUCT=OnlyOffice \
-              COLLABORATION_APP_ADDR=https://localhost:443 \
-              COLLABORATION_WOPI_SRC=http://localhost:9310 \
-              ocis/bin/ocis collaboration server > /tmp/collab-onlyoffice.log 2>&1 &
-          echo $! > /tmp/collab-onlyoffice.pid
-          # Wait for both collaboration services to be healthy
-          timeout 120 bash -c 'until curl -sf http://localhost:9304/healthz; do sleep 2; done'
-          timeout 120 bash -c 'until curl -sf http://localhost:9314/healthz; do sleep 2; done'
-          echo "Collaboration services restarted and healthy."
 
       # Save primary oCIS cert before federation setup overwrites OCIS_CERT
       - name: Save primary oCIS cert
