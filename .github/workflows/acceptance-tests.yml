@@ -606,7 +606,7 @@ jobs:
           elif [[ "${{ matrix.mfa }}" == "true" ]]; then
             SUITE_EXTRA='{"OCIS_MFA_ENABLED":"true"}'
           elif [[ "${{ matrix.collaboration }}" == "true" ]]; then
-            SUITE_EXTRA='{"PROXY_CSP_CONFIG_FILE_LOCATION":"${{ github.workspace }}/tests/config/ci/csp.yaml","COLLABORA_DOMAIN":"localhost:9980","ONLYOFFICE_DOMAIN":"localhost:443"}'
+            SUITE_EXTRA='{"PROXY_CSP_CONFIG_FILE_LOCATION":"${{ github.workspace }}/tests/config/ci/csp.yaml","COLLABORA_DOMAIN":"localhost:9980","ONLYOFFICE_DOMAIN":"localhost:443","FRONTEND_APP_HANDLER_SECURE_VIEW_APP_ADDR":"com.owncloud.api.collaboration.Collabora"}'
           elif [[ "${{ matrix.federated }}" == "true" ]]; then
             SUITE_EXTRA='{"OCIS_ADD_RUN_SERVICES":"ocm","OCIS_ENABLE_OCM":"true","OCM_OCM_INVITE_MANAGER_INSECURE":"true","OCM_OCM_SHARE_PROVIDER_INSECURE":"true","OCM_OCM_STORAGE_PROVIDER_INSECURE":"true","OCM_OCM_PROVIDER_AUTHORIZER_PROVIDERS_FILE":"${{ github.workspace }}/tests/config/local/providers.json"}'
           fi
