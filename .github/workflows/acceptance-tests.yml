@@ -645,7 +645,7 @@ jobs:
           collaboration-apps: ${{ matrix.collaboration == true && 'collabora,onlyoffice' || '' }}
           collabora-image: collabora/code:25.04.7.3.1
           onlyoffice-image: onlyoffice/documentserver:9.2.1
-          app-registry-file: ${{ matrix.collaboration == true && 'tests/config/local/app-registry-office-suites.yaml' || '' }}
+          app-registry-file: ${{ matrix.collaboration == true && 'web/dev/docker/ocis/app-registry.yaml' || '' }}
           # GRAPH_AVAILABLE_ROLES: viewer,spaceViewer,editor,spaceEditor,fileEditor,
           #   editorLite,manager,secureViewer,denied — full set required by e2e role tests.
           extra-server-env: ${{ env.OCIS_EXTRA_SERVER_ENV }}
