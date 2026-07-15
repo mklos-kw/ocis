@@ -823,10 +823,67 @@ jobs:
         with:
           suite: wopi-cs3
 
+  api-tests-vault:
+    name: apiVault
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: "8.4"
+          extensions: curl, xml, mbstring, zip, ldap, gd
+          tools: composer
+      - name: Setup oCIS with Keycloak
+        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        with:
+          ocis-binary-artifact: ocis-binary
+          ociswrapper-artifact: ociswrapper-binary
+          demo-users: "false"
+          keycloak: "true"
+          keycloak-realm-file: tests/config/ci/ocis-mfa-ci-realm.dist.json
+          extra-server-env: >-
+            {
+              "OCIS_ENABLE_VAULT_MODE": "true",
+              "FRONTEND_ENABLE_VAULT_MODE": "true",
+              "OCIS_MFA_ENABLED": "true",
+              "SETTINGS_GRPC_ADDR": "localhost:9191",
+              "WEB_OIDC_SCOPE": "openid profile email acr"
+            }
+      - name: Start storage-users-vault sidecar
+        run: |
+          mkdir -p ~/ocis/storage/users-vault
+          env \
+            OCIS_JWT_SECRET="some-ocis-jwt-secret" \
+            OCIS_INSECURE="true" \
+            STORAGE_USERS_ENABLE_VAULT_MODE=true \
+            STORAGE_USERS_SERVICE_NAME=storage-users-vault \
+            STORAGE_USERS_GRPC_ADDR=localhost:19285 \
+            STORAGE_USERS_HTTP_ADDR=localhost:19286 \
+            STORAGE_USERS_DATA_SERVER_URL=http://localhost:19286/data \
+            STORAGE_USERS_DEBUG_ADDR=localhost:19287 \
+            STORAGE_USERS_OCIS_ROOT="${HOME}/ocis/storage/users-vault" \
+            STORAGE_USERS_EVENTS_CONSUMER_GROUP=vault-dcfs \
+            ocis storage-users server &>/tmp/vault-sidecar.log &
+          echo $! > /tmp/vault-sidecar.pid
+          timeout 120 bash -c 'until curl -sf http://localhost:19287/healthz; do sleep 2; done' \
+            || (echo "=== vault sidecar log ===" && cat /tmp/vault-sidecar.log && exit 1)
+          echo "storage-users-vault ready."
+      - name: Install Playwright browsers
+        run: php vendor-php/playwright-php/playwright/bin/playwright-install --with-deps
+      - name: Export Keycloak env for behat
+        run: |
+          echo "KEYCLOAK=true" >> "$GITHUB_ENV"
+          echo "KC_URL=https://localhost:8443" >> "$GITHUB_ENV"
+      - name: Test apiVault
+        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        with:
+          suite: apiVault
+
   all-acceptance-tests:
     # Not yet gating (run but don't block merge): api-tests-email, api-tests-tika,
     # api-tests-auth-app, core-api-tests, e2e-tests
-    needs: [detect-changes, unit-tests, api-tests-plain, api-tests-antivirus, api-tests-ocm, api-tests-wopi, cli-tests, litmus, cs3api, wopi-builtin, wopi-cs3]
+    needs: [detect-changes, unit-tests, api-tests-plain, api-tests-antivirus, api-tests-ocm, api-tests-wopi, cli-tests, litmus, cs3api, wopi-builtin, wopi-cs3, api-tests-vault]
     runs-on: ubuntu-latest
     if: always()
     steps:
