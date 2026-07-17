@@ -525,6 +525,105 @@ trait Provisioning {
 	}
 
 	/**
+	 * @param array $userAttributes
+	 *
+	 * @return void
+	 * @throws GuzzleException
+	 * @throws JsonException
+	 */
+	public function createKeycloakUser(array $userAttributes): void {
+		$response = KeycloakHelper::createUser(
+			$userAttributes['userid'],
+			$userAttributes['password'],
+			$userAttributes['email'],
+			$userAttributes['displayName'],
+		);
+		if ($response->getStatusCode() !== 201) {
+			$responseBody = (string)$response->getBody();
+			throw new Exception(
+				__METHOD__ .
+				" Unexpected failure when creating the user in keycloak '" .
+				$userAttributes['userid'] . "'" .
+				"\nHTTP status " . $response->getStatusCode() .
+				"\nKeycloak response " . $responseBody,
+			);
+		}
+		$locationHeader = explode("/", $response->getHeader("Location")[0]);
+		$uuid = end($locationHeader);
+		$this->addUserToCreatedUsersList(
+			$userAttributes['userid'],
+			$userAttributes['password'],
+			$userAttributes['displayName'],
+			$userAttributes['email'],
+			$uuid,
+		);
+
+		// assign default ocisUser role to newly created user
+		$res = KeycloakHelper::assignRole($uuid, "User");
+		Assert::assertEquals(
+			204,
+			$res->getStatusCode(),
+			__METHOD__ . " failed to assign realm role to user '" .
+			$userAttributes['userid'] . "'" .
+			"\nHTTP status " . $res->getStatusCode() .
+			"\nKeycloak response " . (string)$res->getBody(),
+		);
+	}
+
+	/**
+	 * @BeforeScenario
+	 *
+	 * @return void
+	 * @throws GuzzleException
+	 * @throws Exception
+	 */
+	public function setAccessTokenForAdmin(): void {
+		if (!KeycloakHelper::isTestingWithKeycloak()) {
+			return;
+		}
+		KeycloakHelper::resetAdminAccessToken();
+		$adminUser = [
+			"password" => "admin",
+			"displayname" => "Admin Admin",
+			"email" => "admin@example.org",
+			"actualUsername" => "admin",
+		];
+		$tokenData = KeycloakHelper::setAccessTokenForKeycloakOcisUser($adminUser);
+		$this->setOcisUserToken($adminUser, $tokenData);
+	}
+
+	/**
+	 * Sets up Keycloak user in oCIS
+	 * User is logged in via web UI and user access token is extracted
+	 *
+	 * @Given user :user has logged in via web UI
+	 *
+	 * @param string $user
+	 *
+	 * @return void
+	 * @throws Exception
+	 */
+	public function userHasLoggedInViaWebUI(string $user): void {
+		$createdUsers = $this->getCreatedUsers();
+		$user = $createdUsers[strtolower($user)];
+		$state = WebUIHelper::setUpUser(
+			$this->getBaseUrl(),
+			$user["actualUsername"],
+			$user["password"],
+		);
+		$localStorageItems = $state['origins'][0]['localStorage'];
+		$tokenItem = current(
+			array_filter($localStorageItems, fn ($item) => str_starts_with($item['name'], 'oc_oAuth.user:'))
+		);
+		if ($tokenItem === false) {
+			$itemNames = implode(', ', array_column($localStorageItems, 'name'));
+			throw new \Exception("OIDC token not found in localStorage; items: " . $itemNames);
+		}
+		$stateData = \json_decode($tokenItem['value']);
+		$this->setOcisUserToken($user, $stateData);
+	}
+
+	/**
 	 * Creates multiple users
 	 *
 	 * This function will allow us to send user creation requests in parallel.
