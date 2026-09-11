@@ -57,7 +57,7 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@feat/migrate-ocis-actions
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
@@ -95,7 +95,7 @@ jobs:
           timeout 30 bash -c 'until curl -sf http://localhost:19287/healthz; do sleep 1; done' \
             || (cat /tmp/vault-storage-users.log && exit 1)
       - name: Test apiVault
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@feat/migrate-ocis-actions
         with:
           suite: apiVault
         env:
