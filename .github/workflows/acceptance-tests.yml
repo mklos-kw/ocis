@@ -476,6 +476,9 @@ jobs:
           keycloak: "true"
           keycloak-realm-file: tests/config/ci/ocis-mfa-ci-realm.dist.json
           web-ui-config: tests/config/ci/ocis-config-vault.json
+          # apiVault's content-search scenarios (vault.feature:901/917, @tikaServiceNeeded)
+          # need the Tika extractor + full-text search enabled, as in native run-github.py.
+          tika: "true"
           extra-server-env: |
             {
               "OCIS_ENABLE_VAULT_MODE": "true",
@@ -589,13 +592,13 @@ jobs:
       matrix:
         include:
           - suite: part-1
-            args: "--type playwright --total-parts 4 --xsuites search,app-provider,ocm,keycloak,mfa,oidc --run-part 1"
+            args: "--type playwright --total-parts 4 --xsuites search,app-provider,ocm,keycloak,mfa,oidc,vault-storage --run-part 1"
           - suite: part-2
-            args: "--type playwright --total-parts 4 --xsuites search,app-provider,ocm,keycloak,mfa,oidc --run-part 2"
+            args: "--type playwright --total-parts 4 --xsuites search,app-provider,ocm,keycloak,mfa,oidc,vault-storage --run-part 2"
           - suite: part-3
-            args: "--type playwright --total-parts 4 --xsuites search,app-provider,ocm,keycloak,mfa,oidc --run-part 3"
+            args: "--type playwright --total-parts 4 --xsuites search,app-provider,ocm,keycloak,mfa,oidc,vault-storage --run-part 3"
           - suite: part-4
-            args: "--type playwright --total-parts 4 --xsuites search,app-provider,ocm,keycloak,mfa,oidc --run-part 4"
+            args: "--type playwright --total-parts 4 --xsuites search,app-provider,ocm,keycloak,mfa,oidc,vault-storage --run-part 4"
           - suite: search
             args: "--type playwright --suites search"
             tika: true
@@ -619,6 +622,10 @@ jobs:
           - suite: ocm
             args: "--type playwright --suites ocm"
             federated: true
+          - suite: vault-storage
+            args: "--type playwright --suites vault-storage"
+            vault_storage: true
+            keycloak_realm_file: tests/config/ci/ocis-mfa-ci-realm.dist.json
     steps:
       # --- tools ---
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -662,6 +669,8 @@ jobs:
             SUITE_EXTRA='{"IDP_ACCESS_TOKEN_EXPIRATION":"30"}'
           elif [[ "${{ matrix.mfa }}" == "true" ]]; then
             SUITE_EXTRA='{"OCIS_MFA_ENABLED":"true"}'
+          elif [[ "${{ matrix.vault_storage }}" == "true" ]]; then
+            SUITE_EXTRA='{"OCIS_MFA_ENABLED":"true","OCIS_ENABLE_VAULT_MODE":"true","FRONTEND_ENABLE_VAULT_MODE":"true","PROXY_CSP_CONFIG_FILE_LOCATION":"${{ github.workspace }}/tests/config/ci/csp.yaml"}'
           elif [[ "${{ matrix.collaboration }}" == "true" ]]; then
             SUITE_EXTRA='{"PROXY_CSP_CONFIG_FILE_LOCATION":"${{ github.workspace }}/tests/config/ci/csp.yaml","COLLABORA_DOMAIN":"localhost:9980","ONLYOFFICE_DOMAIN":"localhost:443","FRONTEND_APP_HANDLER_SECURE_VIEW_APP_ADDR":"com.owncloud.api.collaboration.Collabora"}'
           elif [[ "${{ matrix.federated }}" == "true" ]]; then
@@ -679,7 +688,7 @@ jobs:
           cp "$SRC" "$DEST"
           if [[ "${{ matrix.oidc }}" == "true" ]]; then
             jq '.openIdConnect.scope = "openid profile email offline_access"' "$DEST" > "$DEST.tmp" && mv "$DEST.tmp" "$DEST"
-          elif [[ "${{ matrix.mfa }}" == "true" ]]; then
+          elif [[ "${{ matrix.mfa }}" == "true" || "${{ matrix.vault_storage }}" == "true" ]]; then
             jq '.openIdConnect.scope = "openid profile email acr"' "$DEST" > "$DEST.tmp" && mv "$DEST.tmp" "$DEST"
           elif [[ "${{ matrix.federated }}" == "true" ]]; then
             jq '.apps += ["ocm"]' "$DEST" > "$DEST.tmp" && mv "$DEST.tmp" "$DEST"
@@ -696,7 +705,7 @@ jobs:
           ocis-url: ${{ matrix.federated == true && 'https://localhost:9200' || 'https://127.0.0.1:9200' }}
           demo-users: ${{ matrix.demo_users || 'true' }}
           tika: ${{ matrix.tika || 'false' }}
-          keycloak: ${{ (matrix.keycloak == true || matrix.mfa == true) && 'true' || 'false' }}
+          keycloak: ${{ (matrix.keycloak == true || matrix.mfa == true || matrix.vault_storage == true) && 'true' || 'false' }}
           keycloak-realm-file: ${{ matrix.keycloak_realm_file || 'tests/config/ci/ocis-ci-realm.dist.json' }}
           web-ui-config: tests/config/ci/ocis-config-suite.json
           collaboration-apps: ${{ matrix.collaboration == true && 'collabora,onlyoffice' || '' }}
@@ -706,6 +715,25 @@ jobs:
           # GRAPH_AVAILABLE_ROLES: viewer,spaceViewer,editor,spaceEditor,fileEditor,
           #   editorLite,manager,secureViewer,denied — full set required by e2e role tests.
           extra-server-env: ${{ env.OCIS_EXTRA_SERVER_ENV }}
+
+      # Vault-mode spaces are served by a second storage-users process (matches
+      # run-e2e.py's vault_storage path); the primary instance runs without vault mode.
+      - name: Start vault storage-users
+        if: matrix.vault_storage == true
+        run: |
+          mkdir -p "${HOME}/ocis/storage/users-vault"
+          OCIS_JWT_SECRET=some-ocis-jwt-secret \
+          STORAGE_USERS_ENABLE_VAULT_MODE=true \
+          STORAGE_USERS_SERVICE_NAME=storage-users-vault \
+          STORAGE_USERS_GRPC_ADDR=localhost:19285 \
+          STORAGE_USERS_HTTP_ADDR=localhost:19286 \
+          STORAGE_USERS_DATA_SERVER_URL=http://localhost:19286/data \
+          STORAGE_USERS_DEBUG_ADDR=localhost:19287 \
+          STORAGE_USERS_OCIS_ROOT="${HOME}/ocis/storage/users-vault" \
+          STORAGE_USERS_EVENTS_CONSUMER_GROUP=vault-dcfs \
+          ocis storage-users server &>/tmp/vault-storage-users.log &
+          timeout 30 bash -c 'until curl -sf http://localhost:19287/healthz; do sleep 1; done' \
+            || (cat /tmp/vault-storage-users.log && exit 1)
 
       # Save primary oCIS cert before federation setup overwrites OCIS_CERT
       - name: Save primary oCIS cert
@@ -770,9 +798,10 @@ jobs:
           SKIP_A11Y_TESTS: "true"
           NODE_EXTRA_CA_CERTS: ${{ env.CA_BUNDLE }}
           BROWSER: chromium
-          KEYCLOAK: ${{ (matrix.keycloak == true || matrix.mfa == true) && 'true' || 'false' }}
+          KEYCLOAK: ${{ (matrix.keycloak == true || matrix.mfa == true || matrix.vault_storage == true) && 'true' || 'false' }}
           KEYCLOAK_HOST: localhost:8443
           MFA: ${{ matrix.mfa == true && 'true' || 'false' }}
+          VAULT_MODE: ${{ matrix.vault_storage == true && 'true' || 'false' }}
           OIDC: ${{ matrix.oidc == true && 'true' || 'false' }}
           COLLABORATION: ${{ matrix.collaboration == true && 'true' || 'false' }}
           FEDERATED: ${{ matrix.federated == true && 'true' || 'false' }}
