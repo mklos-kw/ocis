@@ -64,6 +64,7 @@ jobs:
           keycloak: "true"
           keycloak-realm-file: tests/config/ci/ocis-mfa-ci-realm.dist.json
           web-ui-config: tests/config/ci/ocis-config-vault.json
+          tika: "true"
           extra-server-env: |
             {
               "OCIS_ENABLE_VAULT_MODE": "true",
