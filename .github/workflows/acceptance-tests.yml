@@ -254,13 +254,13 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
       - name: Test ${{ matrix.suite }}
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: ${{ matrix.suite }}
 
@@ -284,14 +284,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           email: "true"
       - name: Test ${{ matrix.suite }}
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: ${{ matrix.suite }}
 
@@ -314,14 +314,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           tika: "true"
       - name: Test ${{ matrix.suite }}
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: ${{ matrix.suite }}
 
@@ -337,7 +337,7 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
@@ -345,7 +345,7 @@ jobs:
           antivirus: "true"
           extra-server-env: '{"POSTPROCESSING_STEPS":"virusscan"}'
       - name: Test apiAntivirus
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: apiAntivirus
 
@@ -361,14 +361,14 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
           extra-server-env: '{"OCIS_ADD_RUN_SERVICES":"auth-app","PROXY_ENABLE_APP_AUTH":"true"}'
       - name: Test apiAuthApp
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: apiAuthApp
 
@@ -392,7 +392,7 @@ jobs:
             -e 's|federation-ocis-server:10200|localhost:10200|g' \
             tests/config/ci/providers.json > /tmp/ocm-providers.json
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
@@ -408,7 +408,7 @@ jobs:
             "NOTIFICATIONS_SMTP_SENDER":"ownCloud <noreply@example.com>",
             "NOTIFICATIONS_DEBUG_ADDR":"0.0.0.0:9174"}
       - name: Setup federation oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary: ocis/bin/ocis
           ocis-url: "https://localhost:10200"
@@ -442,7 +442,7 @@ jobs:
             "NOTIFICATIONS_SMTP_INSECURE":"true",
             "NOTIFICATIONS_SMTP_SENDER":"ownCloud <noreply@example.com>"}
       - name: Test apiOcm
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: apiOcm
         env:
@@ -460,7 +460,7 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
@@ -468,7 +468,7 @@ jobs:
           extra-server-env: '{"GATEWAY_GRPC_ADDR":"0.0.0.0:9142"}'
           collaboration-apps: "collabora,onlyoffice,fakeoffice"
       - name: Test apiCollaboration
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: apiCollaboration
         env:
@@ -486,7 +486,7 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
@@ -524,7 +524,7 @@ jobs:
           timeout 30 bash -c 'until curl -sf http://localhost:19287/healthz; do sleep 1; done' \
             || (cat /tmp/vault-storage-users.log && exit 1)
       - name: Test apiVault
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: apiVault
         env:
@@ -551,7 +551,7 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
@@ -559,7 +559,7 @@ jobs:
           email: "true"
           antivirus: "true"
       - name: Test ${{ matrix.suite }}
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: ${{ matrix.suite }}
 
@@ -592,13 +592,13 @@ jobs:
           extensions: curl, xml, mbstring, zip, ldap, gd
           tools: composer
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
           demo-users: "true"
       - name: Test ${{ matrix.suite }}
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: ${{ matrix.suite }}
           acceptance-test-type: core-api
@@ -713,7 +713,7 @@ jobs:
 
       # --- services ---
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           ociswrapper-artifact: ociswrapper-binary
@@ -740,7 +740,7 @@ jobs:
       # --- OCM federation instance (ocm suite only, starts AFTER primary so binary is available) ---
       - name: Setup federation oCIS
         if: matrix.federated == true
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary: ocis/bin/ocis
           ocis-url: "https://localhost:10200"
@@ -827,7 +827,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           demo-users: "true"
@@ -836,7 +836,7 @@ jobs:
           docker-accessible: "true"
           extra-server-env: '{"OCIS_ASYNC_UPLOADS":"false"}'
       - name: Run litmus
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: litmus
 
@@ -848,7 +848,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           demo-users: "true"
@@ -858,7 +858,7 @@ jobs:
             {"GATEWAY_GRPC_ADDR":"0.0.0.0:9142",
             "OCIS_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD":"false"}
       - name: Run cs3api validator
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: cs3api
 
@@ -870,14 +870,14 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           wrapper: "false"
           skip-test-runner-setup: "true"
           collaboration-apps: "fakeoffice"
       - name: Run WOPI validator
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: wopi-builtin
 
@@ -889,7 +889,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup oCIS
-        uses: mklos-kw/ocis-github-actions/ocis-setup@main
+        uses: mklos-kw/actions/ocis-setup@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           ocis-binary-artifact: ocis-binary
           wrapper: "false"
@@ -905,7 +905,7 @@ jobs:
               "APP_PROVIDER_WOPI_FOLDER_URL_BASE_URL": "https://localhost:9200"
             }
       - name: Run WOPI validator
-        uses: mklos-kw/ocis-github-actions/ocis-test@main
+        uses: mklos-kw/actions/ocis-test@2daf5c2aee859fdea3fae63c7382f91144c9f5a1 # owncloud/actions#2 (unmerged)
         with:
           suite: wopi-cs3
 
