@@ -1123,49 +1123,6 @@ jobs:
         env:
           NATS_JWT_DIR: ${{ runner.temp }}/nats-jwt
 
-  acceptance-coverage:
-    name: acceptance-coverage
-    needs: [detect-changes, local-api-tests, cli-tests, ldap-pool-tests, core-api-tests]
-    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.detect-changes.outputs.docs-only != 'true' }}
-    runs-on: ubuntu-latest
-    env:
-      GOCOVERDIR: ${{ github.workspace }}/coverage-reports
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Download raw coverage data
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          pattern: api-coverage-*
-          path: ${{ env.GOCOVERDIR }}
-          merge-multiple: true
-
-      - name: Convert coverage counters to profile
-        run: go tool covdata textfmt -i=${GOCOVERDIR} -o=coverage.out
-
-      - name: Publish coverage summary
-        run: |
-          {
-            echo "## Acceptance test coverage"
-            echo '```'
-            go tool covdata percent -i=${GOCOVERDIR}
-            echo '```'
-            echo
-            echo "<details>"
-            echo "<summary>Per-function coverage</summary>"
-            echo
-            echo '```'
-            go tool cover -func=coverage.out
-            echo '```'
-            echo "</details>"
-          } >> "$GITHUB_STEP_SUMMARY"
-
   all-acceptance-tests:
     # Not yet gating (run but don't block merge): api-tests-email, api-tests-tika,
     # api-tests-auth-app, core-api-tests, e2e-tests
