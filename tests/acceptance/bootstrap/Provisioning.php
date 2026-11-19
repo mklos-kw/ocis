@@ -751,6 +751,34 @@ trait Provisioning {
 	}
 
 	/**
+	 * @param string $user
+	 *
+	 * @return void
+	 */
+	public function userHasLoggedInViaWebUI(string $user): void {
+		$createdUsers = $this->getCreatedUsers();
+		$user = $createdUsers[strtolower($user)];
+		$state = WebUIHelper::setUpUser(
+			$this->getBaseUrl(),
+			$user["actualUsername"],
+			$user["password"],
+		);
+		$localStorageItems = $state['origins'][0]['localStorage'];
+		$tokenItem = current(
+			array_filter(
+				$localStorageItems,
+				fn ($item) => str_starts_with($item['name'], 'oc_oAuth.user:'),
+			),
+		);
+		if ($tokenItem === false) {
+			$itemNames = implode(', ', array_column($localStorageItems, 'name'));
+			throw new \Exception("OIDC token not found in localStorage; items: " . $itemNames);
+		}
+		$stateData = \json_decode($tokenItem['value']);
+		$this->setOcisUserToken($user, $stateData);
+	}
+
+	/**
 	 * Creates multiple users
 	 *
 	 * This function will allow us to send user creation requests in parallel.
